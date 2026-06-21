@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/battles", label: "Battles" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/groups", label: "Rage Groups" },
+  { href: "/invites", label: "Challenges" },
   { href: "/profile", label: "Profile" },
 ];
 

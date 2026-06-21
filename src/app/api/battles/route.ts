@@ -1,26 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { z } from "zod";
+import { battleCreateSchema } from "@/lib/validation";
 
-const createBattleSchema = z.object({
-  title: z.string().min(3).max(140),
-  topic: z.string().min(1).max(60),
-  battleType: z.enum(["casual", "ranked", "friend", "tournament", "group", "event"]).default("casual"),
-  mode: z.enum(["text", "image", "meme"]).default("text"),
-  rounds: z.number().int().min(1).max(10).default(3),
-});
+const BATTLE_EXPIRY_MINUTES = 10;
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid ambiguity
 
-// GET /api/battles?status=open|live|completed
+function generateBattleCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += CODE_ALPHABET[crypto.randomInt(0, CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+async function generateUniqueBattleCode(): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateBattleCode();
+    const existing = await sql`SELECT 1 FROM battles WHERE battle_code = ${code} LIMIT 1`;
+    if (existing.length === 0) return code;
+  }
+  // Astronomically unlikely to ever hit this, but fail loudly rather than silently collide.
+  throw new Error("Could not generate a unique battle code.");
+}
+
+/** Flips any 'waiting' battles past their expiry into 'expired'. Cheap, indexed, runs on every read. */
+async function expireStaleBattles() {
+  await sql`
+    UPDATE battles SET status = 'expired'
+    WHERE status = 'waiting' AND expires_at < now()
+  `;
+}
+
+// GET /api/battles?status=waiting|active|completed  (omit status to get everything except cancelled/expired)
 export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status");
 
   try {
+    await expireStaleBattles();
+
     const rows = status
       ? await sql`
           SELECT
-            b.id, b.title, b.topic, b.battle_type, b.mode, b.status,
-            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at,
+            b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
             creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
             opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
           FROM battles b
@@ -32,13 +56,14 @@ export async function GET(req: NextRequest) {
         `
       : await sql`
           SELECT
-            b.id, b.title, b.topic, b.battle_type, b.mode, b.status,
-            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at,
+            b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
             creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
             opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
           FROM battles b
           JOIN users creator ON creator.id = b.created_by
           LEFT JOIN users opponent ON opponent.id = b.opponent_id
+          WHERE b.status NOT IN ('cancelled', 'expired')
           ORDER BY b.created_at DESC
           LIMIT 50
         `;
@@ -50,7 +75,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/battles  — create a new open battle (waiting for an opponent)
+// POST /api/battles — create a new battle, status 'waiting', auto-expires in 10 minutes if nobody joins
 export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
   if (!session) {
@@ -64,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const parsed = createBattleSchema.safeParse(body);
+  const parsed = battleCreateSchema.safeParse(body);
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
     return NextResponse.json({ error: firstError?.message ?? "Invalid input." }, { status: 400 });
@@ -73,10 +98,13 @@ export async function POST(req: NextRequest) {
   const { title, topic, battleType, mode, rounds } = parsed.data;
 
   try {
+    const battleCode = await generateUniqueBattleCode();
+    const expiresAt = new Date(Date.now() + BATTLE_EXPIRY_MINUTES * 60 * 1000);
+
     const rows = await sql`
-      INSERT INTO battles (title, topic, battle_type, mode, status, created_by, rounds)
-      VALUES (${title}, ${topic}, ${battleType}, ${mode}, 'open', ${session.userId}, ${rounds})
-      RETURNING id, title, topic, battle_type, mode, status, rounds, created_at
+      INSERT INTO battles (title, topic, battle_type, mode, status, created_by, rounds, battle_code, expires_at)
+      VALUES (${title}, ${topic}, ${battleType}, ${mode}, 'waiting', ${session.userId}, ${rounds}, ${battleCode}, ${expiresAt.toISOString()})
+      RETURNING id, battle_code, title, topic, battle_type, mode, status, rounds, created_at, expires_at
     `;
 
     return NextResponse.json({ battle: rows[0] }, { status: 201 });

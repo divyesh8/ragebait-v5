@@ -23,9 +23,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    // COALESCE so omitted fields keep their existing value instead of being
+    // wiped out — only fields actually present in the request body change.
     const rows = await sql`
       UPDATE users
-      SET bio = ${parsed.data.bio}, avatar_url = ${parsed.data.avatarUrl}
+      SET
+        bio = COALESCE(${parsed.data.bio ?? null}, bio),
+        avatar_url = COALESCE(${parsed.data.avatarUrl || null}, avatar_url)
       WHERE id = ${session.userId}
       RETURNING id, username, email, aura, level, xp, wins, losses,
                 current_streak, best_streak, bio, avatar_url, created_at

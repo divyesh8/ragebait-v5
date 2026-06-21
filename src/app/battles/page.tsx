@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import CreateBattleForm from "@/components/battle/CreateBattleForm";
@@ -9,15 +10,17 @@ import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface BattleListItem {
   id: string;
+  battle_code: string;
   title: string;
   topic: string;
   battle_type: string;
   mode: string;
-  status: "open" | "live" | "judging" | "completed" | "cancelled";
+  status: "waiting" | "active" | "judging" | "completed" | "cancelled" | "expired";
   rounds: number;
   winner_id: string | null;
   ai_summary: string | null;
   created_at: string;
+  expires_at: string | null;
   creator_id: string;
   creator_username: string;
   creator_avatar: string;
@@ -27,19 +30,21 @@ interface BattleListItem {
 }
 
 const statusStyles: Record<string, string> = {
-  open: "text-aura-blue",
-  live: "text-aura-crimson",
+  waiting: "text-aura-blue",
+  active: "text-aura-crimson",
   judging: "text-aura-purple",
   completed: "text-white/40",
   cancelled: "text-white/30",
+  expired: "text-white/30",
 };
 
 const statusLabels: Record<string, string> = {
-  open: "Open — needs opponent",
-  live: "Live",
+  waiting: "Waiting — needs opponent",
+  active: "Active",
   judging: "AI Judging",
   completed: "Completed",
   cancelled: "Cancelled",
+  expired: "Expired",
 };
 
 function avatarFor(username: string, avatarUrl: string | null) {
@@ -47,15 +52,18 @@ function avatarFor(username: string, avatarUrl: string | null) {
 }
 
 export default function BattlesPage() {
+  const router = useRouter();
   const { user } = useCurrentUser();
   const [battles, setBattles] = useState<BattleListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [codeInput, setCodeInput] = useState("");
+  const [codeSearching, setCodeSearching] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
-  async function loadBattles() {
-    setLoading(true);
+  const loadBattles = useCallback(async () => {
     try {
       const res = await fetch("/api/battles");
       const data = await res.json();
@@ -65,11 +73,14 @@ export default function BattlesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadBattles();
-  }, []);
+    // Light polling so "waiting" cards flip to "active" without a manual refresh.
+    const interval = setInterval(loadBattles, 8000);
+    return () => clearInterval(interval);
+  }, [loadBattles]);
 
   async function handleJoin(battleId: string) {
     if (!user) {
@@ -93,9 +104,30 @@ export default function BattlesPage() {
     }
   }
 
+  async function handleCodeSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const code = codeInput.trim();
+    if (!code) return;
+    setCodeSearching(true);
+    setCodeError(null);
+    try {
+      const res = await fetch(`/api/battles/code/${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setCodeError(data.error ?? "No battle found with that code.");
+        return;
+      }
+      router.push(`/battles/${data.battle.id}`);
+    } catch {
+      setCodeError("Could not reach the server.");
+    } finally {
+      setCodeSearching(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
-      <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-4xl font-bold">Battles</h1>
           <p className="mt-2 text-white/50">
@@ -114,6 +146,20 @@ export default function BattlesPage() {
           </Link>
         )}
       </div>
+
+      <form onSubmit={handleCodeSearch} className="mb-10 flex flex-wrap items-center gap-2">
+        <input
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+          placeholder="Got a battle code? Enter it here (e.g. X7K2PQ)"
+          maxLength={8}
+          className="w-72 rounded-full border border-line bg-surface2 px-4 py-2 text-sm font-mono uppercase tracking-wider text-white placeholder:text-white/30 placeholder:font-sans placeholder:tracking-normal placeholder:normal-case focus-visible:border-aura-purple"
+        />
+        <Button type="submit" variant="secondary" size="sm" disabled={codeSearching}>
+          {codeSearching ? "Searching..." : "Find battle"}
+        </Button>
+        {codeError && <span className="text-xs text-aura-crimson">{codeError}</span>}
+      </form>
 
       {error && (
         <div className="mb-6 rounded-xl border border-aura-crimson/40 bg-aura-crimson/10 px-4 py-3 text-sm text-aura-crimson">
@@ -138,7 +184,7 @@ export default function BattlesPage() {
                   {battle.topic}
                 </span>
                 <span className={`text-xs font-semibold uppercase ${statusStyles[battle.status]}`}>
-                  {battle.status === "live" && (
+                  {battle.status === "active" && (
                     <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulseGlow rounded-full bg-aura-crimson" />
                   )}
                   {statusLabels[battle.status]}
@@ -183,10 +229,10 @@ export default function BattlesPage() {
                   <span className="capitalize">{battle.battle_type} battle</span>
                   <span className="capitalize">{battle.mode}</span>
                 </div>
-                <span>{battle.rounds} rounds</span>
+                <span className="font-mono">#{battle.battle_code}</span>
               </div>
 
-              {battle.status === "open" && user && battle.creator_id !== user.id ? (
+              {battle.status === "waiting" && user && battle.creator_id !== user.id ? (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -201,7 +247,7 @@ export default function BattlesPage() {
                   <Button variant="secondary" size="sm" className="w-full">
                     {battle.status === "completed" || battle.status === "judging"
                       ? "View result"
-                      : battle.status === "open"
+                      : battle.status === "waiting"
                       ? "View battle"
                       : "Open battle"}
                   </Button>

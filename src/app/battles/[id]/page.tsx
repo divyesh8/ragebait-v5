@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -9,11 +9,12 @@ import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface BattleDetail {
   id: string;
+  battle_code: string;
   title: string;
   topic: string;
   battle_type: string;
   mode: string;
-  status: "open" | "live" | "judging" | "completed" | "cancelled";
+  status: "waiting" | "active" | "judging" | "completed" | "cancelled" | "expired";
   rounds: number;
   winner_id: string | null;
   ai_summary: string | null;
@@ -25,6 +26,7 @@ interface BattleDetail {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  expires_at: string | null;
   creator_id: string;
   creator_username: string;
   creator_avatar: string;
@@ -60,8 +62,31 @@ const scoreLabels: Record<string, string> = {
   total: "Total",
 };
 
+function useCountdown(expiresAt: string | null, active: boolean) {
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!expiresAt || !active) {
+      setRemainingMs(null);
+      return;
+    }
+    const target = new Date(expiresAt).getTime();
+    const tick = () => setRemainingMs(Math.max(0, target - Date.now()));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt, active]);
+
+  if (remainingMs === null) return null;
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export default function BattleDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const battleId = params.id as string;
   const { user } = useCurrentUser();
 
@@ -72,6 +97,12 @@ export default function BattleDetailPage() {
   const [posting, setPosting] = useState(false);
   const [judging, setJudging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTopic, setEditTopic] = useState("");
+  const [editRounds, setEditRounds] = useState(3);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -94,12 +125,19 @@ export default function BattleDetailPage() {
     load();
   }, [load]);
 
-  // Light polling while the battle is live so both players see new roasts.
+  // Poll while the battle is in any non-terminal state — this is what
+  // actually lets a creator find out the moment someone joins. Previously
+  // this only polled once status was already "active", which meant it never
+  // ran at all while waiting for an opponent.
   useEffect(() => {
-    if (!battle || battle.status !== "live") return;
-    const interval = setInterval(load, 5000);
+    if (!battle) return;
+    const terminal = ["completed", "cancelled", "expired"];
+    if (terminal.includes(battle.status)) return;
+    const interval = setInterval(load, 4000);
     return () => clearInterval(interval);
   }, [battle, load]);
+
+  const countdown = useCountdown(battle?.expires_at ?? null, battle?.status === "waiting");
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -147,6 +185,86 @@ export default function BattleDetailPage() {
     }
   }
 
+  async function handleCancel() {
+    if (!confirm("Cancel this battle? This can't be undone.")) return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/battles/${battleId}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not cancel this battle.");
+        return;
+      }
+      await load();
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete this battle permanently? This can't be undone.")) return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/battles/${battleId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not delete this battle.");
+        return;
+      }
+      router.push("/battles");
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function startEditing() {
+    if (!battle) return;
+    setEditTitle(battle.title);
+    setEditTopic(battle.topic);
+    setEditRounds(battle.rounds);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setActionBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/battles/${battleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, topic: editTopic, rounds: editRounds }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not save changes.");
+        return;
+      }
+      setEditing(false);
+      await load();
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  function copyCode() {
+    if (!battle) return;
+    navigator.clipboard.writeText(battle.battle_code).then(() => {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1500);
+    });
+  }
+
+  const isOwner = useMemo(() => Boolean(user && battle && user.id === battle.creator_id), [user, battle]);
+
   if (loading) {
     return <div className="mx-auto max-w-3xl px-6 py-12 text-center text-white/50">Loading battle...</div>;
   }
@@ -166,7 +284,7 @@ export default function BattleDetailPage() {
   const myMessageCount = user
     ? messages.filter((m) => m.user_id === user.id).length
     : 0;
-  const canPost = isParticipant && battle.status === "live" && myMessageCount < battle.rounds;
+  const canPost = isParticipant && battle.status === "active" && myMessageCount < battle.rounds;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -179,6 +297,24 @@ export default function BattleDetailPage() {
         <span className="rounded-full bg-surface2 px-3 py-1 text-xs font-medium uppercase tracking-wide text-aura-purple">
           {battle.topic}
         </span>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-white/40">
+        <button
+          onClick={copyCode}
+          className="flex items-center gap-1.5 rounded-full border border-line bg-surface2 px-3 py-1 font-mono tracking-wider text-white/70 hover:border-aura-purple hover:text-white"
+          title="Click to copy"
+        >
+          #{battle.battle_code}
+          <span>{codeCopied ? "✓ copied" : "copy"}</span>
+        </button>
+        {battle.status === "waiting" && countdown && (
+          <span className={countdown.startsWith("0:") ? "text-aura-crimson" : ""}>
+            Expires in {countdown} if nobody joins
+          </span>
+        )}
+        {battle.status === "cancelled" && <span>This battle was cancelled.</span>}
+        {battle.status === "expired" && <span>This battle expired — nobody joined in time.</span>}
       </div>
 
       <div className="mt-4 flex items-center gap-4">
@@ -198,6 +334,66 @@ export default function BattleDetailPage() {
           <span className="text-sm text-white/30">Waiting for opponent...</span>
         )}
       </div>
+
+      {/* Owner controls */}
+      {isOwner && battle.status === "waiting" && !editing && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={startEditing} disabled={actionBusy}>
+            Edit
+          </Button>
+          <Button variant="danger" size="sm" onClick={handleCancel} disabled={actionBusy}>
+            Cancel battle
+          </Button>
+          <Button variant="danger" size="sm" onClick={handleDelete} disabled={actionBusy}>
+            Delete
+          </Button>
+        </div>
+      )}
+      {isOwner && ["cancelled", "expired"].includes(battle.status) && (
+        <div className="mt-4">
+          <Button variant="danger" size="sm" onClick={handleDelete} disabled={actionBusy}>
+            Delete
+          </Button>
+        </div>
+      )}
+
+      {editing && (
+        <form onSubmit={handleSaveEdit} className="mt-4 space-y-3 rounded-xl border border-line bg-surface2 p-4">
+          <input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Battle title"
+            maxLength={140}
+            className="w-full rounded-lg border border-line bg-void px-3 py-2 text-sm text-white"
+          />
+          <input
+            value={editTopic}
+            onChange={(e) => setEditTopic(e.target.value)}
+            placeholder="Topic"
+            maxLength={60}
+            className="w-full rounded-lg border border-line bg-void px-3 py-2 text-sm text-white"
+          />
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-white/50">Rounds</label>
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={editRounds}
+              onChange={(e) => setEditRounds(Number(e.target.value))}
+              className="w-20 rounded-lg border border-line bg-void px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={actionBusy}>
+              {actionBusy ? "Saving..." : "Save"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={actionBusy}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
 
       {error && (
         <div className="mt-4 rounded-xl border border-aura-crimson/40 bg-aura-crimson/10 px-4 py-3 text-sm text-aura-crimson">
@@ -304,13 +500,13 @@ export default function BattleDetailPage() {
         </form>
       )}
 
-      {isParticipant && battle.status === "live" && !canPost && myMessageCount >= battle.rounds && (
+      {isParticipant && battle.status === "active" && !canPost && myMessageCount >= battle.rounds && (
         <p className="mt-6 text-center text-sm text-white/40">
           You&apos;ve posted all {battle.rounds} of your roasts. Waiting for your opponent...
         </p>
       )}
 
-      {battle.status === "open" && (
+      {battle.status === "waiting" && (
         <p className="mt-6 text-center text-sm text-white/40">
           Waiting for an opponent to join this battle.
         </p>

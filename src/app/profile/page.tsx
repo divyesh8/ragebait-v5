@@ -4,6 +4,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import AuraBadge from "@/components/ui/AuraBadge";
 import Button from "@/components/ui/Button";
+import AvatarPicker from "@/components/profile/AvatarPicker";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { useEffect, useState } from "react";
 
@@ -19,6 +20,8 @@ export default function ProfilePage() {
   const { user, loading } = useCurrentUser();
   const [history, setHistory] = useState<AuraTransaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -76,7 +79,9 @@ export default function ProfilePage() {
   ];
 
   const avatarUrl =
-    user.avatar_url || `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(user.username)}`;
+    avatarOverride ||
+    user.avatar_url ||
+    `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(user.username)}`;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
@@ -85,11 +90,19 @@ export default function ProfilePage() {
 
       <div className="relative -mt-12 flex flex-col items-start gap-4 px-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-end gap-4">
-          <img
-            src={avatarUrl}
-            alt={user.username}
-            className="h-24 w-24 rounded-2xl border-4 border-void bg-surface2 sm:h-28 sm:w-28"
-          />
+          <div className="group relative">
+            <img
+              src={avatarUrl}
+              alt={user.username}
+              className="h-24 w-24 rounded-2xl border-4 border-void bg-surface2 sm:h-28 sm:w-28"
+            />
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 text-xs font-medium text-white opacity-0 transition group-hover:bg-black/50 group-hover:opacity-100"
+            >
+              Change
+            </button>
+          </div>
           <div className="pb-2">
             <h1 className="font-display text-2xl font-bold sm:text-3xl">
               {user.username}
@@ -103,10 +116,25 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
-        <Link href="/battles">
-          <Button size="sm">+ Start a battle</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/settings">
+            <Button size="sm" variant="secondary">
+              Settings
+            </Button>
+          </Link>
+          <Link href="/battles">
+            <Button size="sm">+ Start a battle</Button>
+          </Link>
+        </div>
       </div>
+
+      {showAvatarPicker && (
+        <AvatarPicker
+          currentAvatarUrl={avatarUrl}
+          onSelected={(newUrl) => setAvatarOverride(newUrl)}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
 
       <p className="mt-6 max-w-2xl text-white/60">
         {user.bio || "No bio yet."}

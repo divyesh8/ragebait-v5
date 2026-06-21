@@ -3,3 +3,7 @@ node_modules/
 .next/ 
 .vercel
 .env*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
