@@ -219,8 +219,8 @@ export default function ProfilePage() {
               }}
             />
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={saveBio} loading={bioSaving}>
-                Save
+              <Button size="sm" onClick={saveBio} disabled={bioSaving}>
+                {bioSaving ? "Saving..." : "Save"}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => { setEditingBio(false); setBioValue(user.bio || ""); }}>
                 Cancel
