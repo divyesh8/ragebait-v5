@@ -4,6 +4,7 @@ import clsx from "clsx";
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
+  loading?: boolean;
 }
 
 export default function Button({
@@ -11,6 +12,7 @@ export default function Button({
   size = "md",
   className,
   children,
+  loading,
   ...props
 }: ButtonProps) {
   return (
@@ -33,9 +35,10 @@ export default function Button({
         },
         className
       )}
+      disabled={loading || props.disabled}
       {...props}
     >
-      {children}
+      {loading ? "Saving..." : children}
     </button>
   );
 }
