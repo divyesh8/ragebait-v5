@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
+import { invalidateUserCache } from "@/lib/hooks/useCurrentUser";
 
 export default function SignupForm() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function SignupForm() {
     confirmPassword: "",
     dob: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -20,9 +22,24 @@ export default function SignupForm() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  // Password strength
+  const checks = [
+    { label: "8+ characters",    pass: form.password.length >= 8 },
+    { label: "Uppercase letter", pass: /[A-Z]/.test(form.password) },
+    { label: "Number",           pass: /[0-9]/.test(form.password) },
+  ];
+  const strength = checks.filter((c) => c.pass).length;
+  const strengthColor = strength === 3 ? "bg-aura-green" : strength === 2 ? "bg-aura-blue" : strength === 1 ? "bg-aura-gold" : "bg-white/10";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -40,6 +57,9 @@ export default function SignupForm() {
         return;
       }
 
+      // Reset the singleton so the Navbar immediately picks up the new user
+      invalidateUserCache();
+
       router.push("/profile");
       router.refresh();
     } catch {
@@ -49,7 +69,7 @@ export default function SignupForm() {
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       {error && (
         <div className="rounded-xl border border-aura-crimson/40 bg-aura-crimson/10 px-4 py-3 text-sm text-aura-crimson">
           {error}
@@ -60,20 +80,20 @@ export default function SignupForm() {
         <label htmlFor="username" className="block text-sm font-medium text-white/70">
           Username
         </label>
-        <input
-          id="username"
-          name="username"
-          type="text"
-          autoComplete="username"
-          required
-          value={form.username}
-          onChange={(e) => update("username", e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
-          placeholder="Pick something unique"
-        />
-        <p className="mt-1 text-xs text-white/30">
-          3-20 characters: letters, numbers, and underscores only.
-        </p>
+        <div className="relative mt-1.5">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-sm">@</span>
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            required
+            value={form.username}
+            onChange={(e) => update("username", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+            className="w-full rounded-xl border border-line bg-surface2 pl-8 pr-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-aura-purple focus:outline-none transition-colors"
+            placeholder="your_username"
+          />
+        </div>
+        <p className="mt-1 text-xs text-white/30">3–20 chars: letters, numbers, underscores only.</p>
       </div>
 
       <div>
@@ -82,69 +102,87 @@ export default function SignupForm() {
         </label>
         <input
           id="email"
-          name="email"
           type="email"
           autoComplete="email"
           required
           value={form.email}
           onChange={(e) => update("email", e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
+          className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-aura-purple focus:outline-none transition-colors"
           placeholder="you@example.com"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-white/70">
-            Password
-          </label>
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-white/70">
+          Password
+        </label>
+        <div className="relative mt-1.5">
           <input
             id="password"
-            name="password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             required
             value={form.password}
             onChange={(e) => update("password", e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
+            className="w-full rounded-xl border border-line bg-surface2 px-4 py-3 pr-12 text-sm text-white placeholder:text-white/30 focus:border-aura-purple focus:outline-none transition-colors"
             placeholder="••••••••"
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 hover:text-white/60"
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
         </div>
+        {/* Strength bar */}
+        {form.password && (
+          <div className="mt-2 space-y-1.5">
+            <div className="flex gap-1">
+              {[1,2,3].map((i) => (
+                <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= strength ? strengthColor : "bg-white/10"}`} />
+              ))}
+            </div>
+            <div className="flex gap-3">
+              {checks.map((c) => (
+                <span key={c.label} className={`text-[11px] flex items-center gap-1 ${c.pass ? "text-aura-green" : "text-white/30"}`}>
+                  {c.pass ? "✓" : "○"} {c.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/70">
             Confirm
           </label>
           <input
             id="confirmPassword"
-            name="confirmPassword"
             type="password"
             autoComplete="new-password"
             required
             value={form.confirmPassword}
             onChange={(e) => update("confirmPassword", e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
+            className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-aura-purple focus:outline-none transition-colors"
             placeholder="••••••••"
           />
         </div>
-      </div>
-
-      <p className="text-xs text-white/30">
-        Min 8 characters, with an uppercase letter, a lowercase letter, and a number.
-      </p>
-
-      <div>
-        <label htmlFor="dob" className="block text-sm font-medium text-white/70">
-          Date of birth
-        </label>
-        <input
-          id="dob"
-          name="dob"
-          type="date"
-          required
-          value={form.dob}
-          onChange={(e) => update("dob", e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white focus-visible:border-aura-purple"
-        />
+        <div>
+          <label htmlFor="dob" className="block text-sm font-medium text-white/70">
+            Date of birth
+          </label>
+          <input
+            id="dob"
+            type="date"
+            required
+            value={form.dob}
+            onChange={(e) => update("dob", e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white focus:border-aura-purple focus:outline-none transition-colors"
+          />
+        </div>
       </div>
 
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
@@ -152,8 +190,7 @@ export default function SignupForm() {
       </Button>
 
       <p className="text-center text-xs text-white/30">
-        Email verification (OTP) is coming soon — your account is created
-        immediately for now.
+        Email verification coming soon — your account is ready immediately.
       </p>
     </form>
   );
