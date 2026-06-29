@@ -13,7 +13,7 @@ export interface CurrentUser {
   losses: number;
   current_streak: number;
   best_streak: number;
-  bio: string;
+  bio: string | null;
   avatar_url: string | null;
   created_at: string;
 }
@@ -57,12 +57,25 @@ function fetchMe(): Promise<void> {
   return fetchPromise;
 }
 
-// Call this after login/signup/logout to reset the singleton
+// Call this after logout to clear state and notify all listeners
 export function invalidateUserCache() {
   cachedUser = null;
   fetchState = "idle";
   fetchPromise = null;
   notify(null);
+}
+
+// Call this after login/signup: clears state, re-fetches, then notifies
+// Returns a promise that resolves once the fresh user data is loaded
+export async function refreshUserCache(): Promise<CurrentUser | null> {
+  cachedUser = null;
+  fetchState = "idle";
+  fetchPromise = null;
+  // Notify null immediately so UI can show loading state
+  notify(null);
+  // Now fetch fresh data
+  await fetchMe();
+  return cachedUser;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

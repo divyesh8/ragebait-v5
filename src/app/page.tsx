@@ -5,6 +5,7 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import AuraBadge from "@/components/ui/AuraBadge";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface BattleListItem {
   id: string;
@@ -74,6 +75,7 @@ const topics = [
 ];
 
 export default function HomePage() {
+  const { user } = useCurrentUser();
   const [battles, setBattles] = useState<BattleListItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,14 +122,29 @@ export default function HomePage() {
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4 animate-rise">
-            <Link href="/signup">
-              <Button size="lg">Create your profile</Button>
-            </Link>
-            <Link href="/battles">
-              <Button size="lg" variant="secondary">
-                View battles
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <Link href="/battles">
+                  <Button size="lg">Start a Battle</Button>
+                </Link>
+                <Link href="/profile">
+                  <Button size="lg" variant="secondary">
+                    My Profile
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/signup">
+                  <Button size="lg">Create your profile</Button>
+                </Link>
+                <Link href="/battles">
+                  <Button size="lg" variant="secondary">
+                    View battles
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -320,14 +337,24 @@ export default function HomePage() {
       <section className="border-t border-line bg-crimson-gradient">
         <div className="mx-auto max-w-7xl px-6 py-16 text-center">
           <h2 className="font-display text-3xl font-bold text-void sm:text-4xl">
-            Your Aura starts at zero. Where it goes is up to you.
+            {user
+              ? "Your next battle is waiting. Go claim that Aura."
+              : "Your Aura starts at zero. Where it goes is up to you."}
           </h2>
           <div className="mt-8">
-            <Link href="/signup">
-              <Button size="lg" variant="secondary" className="bg-void text-white">
-                Create your profile
-              </Button>
-            </Link>
+            {user ? (
+              <Link href="/battles">
+                <Button size="lg" variant="secondary" className="bg-void text-white">
+                  Find a battle
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/signup">
+                <Button size="lg" variant="secondary" className="bg-void text-white">
+                  Create your profile
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

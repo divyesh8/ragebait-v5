@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import { invalidateUserCache } from "@/lib/hooks/useCurrentUser";
+import { refreshUserCache } from "@/lib/hooks/useCurrentUser";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -33,8 +33,8 @@ export default function LoginForm() {
         return;
       }
 
-      // Reset the singleton so the Navbar immediately re-fetches the new user
-      invalidateUserCache();
+      // Fetch fresh user data before navigating so Navbar updates immediately
+      await refreshUserCache();
 
       router.push("/profile");
       router.refresh();
