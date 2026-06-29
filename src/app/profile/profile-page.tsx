@@ -199,7 +199,6 @@ export default function ProfilePage() {
           onSelected={async (newUrl) => {
             setAvatarOverride(newUrl);
             setShowAvatarPicker(false);
-            // Refresh global user cache so Navbar avatar updates too
             await refresh();
           }}
           onClose={() => setShowAvatarPicker(false)}
@@ -224,8 +223,8 @@ export default function ProfilePage() {
               }}
             />
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={saveBio} loading={bioSaving}>
-                Save
+              <Button size="sm" onClick={saveBio} disabled={bioSaving}>
+                {bioSaving ? "Saving..." : "Save"}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => { setEditingBio(false); setBioValue(user.bio ?? ""); }}>
                 Cancel
@@ -243,7 +242,6 @@ export default function ProfilePage() {
             <p className="text-white/60 text-sm leading-relaxed flex-1">
               {user.bio || <span className="italic text-white/25">No bio yet — click to add one</span>}
             </p>
-            {/* Edit pencil icon */}
             <svg className="h-4 w-4 flex-shrink-0 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
@@ -329,7 +327,6 @@ export default function ProfilePage() {
 
               return (
                 <Card key={battle.id} className="flex items-center gap-4">
-                  {/* Result indicator */}
                   <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                     isWin  ? "bg-aura-green/15 text-aura-green border border-aura-green/20" :
                     isLoss ? "bg-aura-crimson/15 text-aura-crimson border border-aura-crimson/20" :
@@ -338,7 +335,6 @@ export default function ProfilePage() {
                     {isWin ? "W" : isLoss ? "L" : "—"}
                   </div>
 
-                  {/* Battle info */}
                   <div className="flex-1 min-w-0">
                     <Link href={`/battles/${battle.id}`} className="hover:text-aura-purple transition-colors">
                       <p className="text-sm font-semibold truncate">{battle.title}</p>
@@ -356,10 +352,9 @@ export default function ProfilePage() {
                     </p>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/battles/${battle.id}`}>
-                      <Button size="sm" variant="secondary">View</Button>
+                      <Button size="xs" variant="secondary">View</Button>
                     </Link>
 
                     {canDelete && (
@@ -368,12 +363,12 @@ export default function ProfilePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-white/50">Sure?</span>
                             <Button
-  size="sm"
-  variant="danger"
-  loading={deletingId === battle.id}
-  onClick={() => deleteBattle(battle.id)}
+                              size="xs"
+                              variant="danger"
+                              disabled={deletingId === battle.id}
+                              onClick={() => deleteBattle(battle.id)}
                             >
-                              Delete
+                              {deletingId === battle.id ? "Deleting..." : "Delete"}
                             </Button>
                             <button
                               onClick={() => setConfirmDelete(null)}

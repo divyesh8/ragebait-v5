@@ -123,7 +123,7 @@ export default function Navbar() {
                         <img src={avatarUrl} alt={user.username} className="h-9 w-9 rounded-full" />
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{user.username}</p>
-                          <AuraBadge value={user.aura} size="xs" trend="neutral" />
+                          <AuraBadge value={user.aura} size="sm" trend="neutral" />
                         </div>
                       </div>
                       <Link href="/profile"  onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-colors">
