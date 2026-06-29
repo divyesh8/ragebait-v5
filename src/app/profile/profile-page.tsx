@@ -354,7 +354,7 @@ export default function ProfilePage() {
 
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/battles/${battle.id}`}>
-                      <Button size="xs" variant="secondary">View</Button>
+                     <Button size="sm" variant="secondary">View</Button>
                     </Link>
 
                     {canDelete && (
