@@ -363,13 +363,13 @@ export default function ProfilePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-white/50">Sure?</span>
                             <Button
-                             size="sm"
-                              variant="danger"
-                              loading={deletingId === battle.id}
-                              onClick={() => deleteBattle(battle.id)}
-                            >
-                              Delete
-                            </Button>
+                               size="sm"
+                               variant="danger"
+                               disabled={deletingId === battle.id}
+                               onClick={() => deleteBattle(battle.id)}
+>
+                               {deletingId === battle.id ? "Deleting..." : "Delete"}
+                                </Button>
                             <button
                               onClick={() => setConfirmDelete(null)}
                               className="text-xs text-white/40 hover:text-white px-1"
