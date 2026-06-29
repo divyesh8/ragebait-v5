@@ -193,7 +193,7 @@ export default function Navbar() {
                   <img src={avatarUrl} alt={user.username} className="h-10 w-10 rounded-full" />
                   <div>
                     <p className="font-semibold text-sm">{user.username}</p>
-                    <AuraBadge value={user.aura} size="xs" trend="neutral" />
+                    <AuraBadge value={user.aura} size="sm" trend="neutral" />
                   </div>
                 </div>
               )}
