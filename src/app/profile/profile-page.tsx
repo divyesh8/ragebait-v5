@@ -368,10 +368,10 @@ export default function ProfilePage() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-white/50">Sure?</span>
                             <Button
-                              size="xs"
-                              variant="danger"
-                              loading={deletingId === battle.id}
-                              onClick={() => deleteBattle(battle.id)}
+  size="sm"
+  variant="danger"
+  loading={deletingId === battle.id}
+  onClick={() => deleteBattle(battle.id)}
                             >
                               Delete
                             </Button>
