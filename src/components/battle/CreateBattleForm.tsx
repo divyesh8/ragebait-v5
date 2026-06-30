@@ -28,7 +28,9 @@ interface CreateBattleFormProps {
 export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [topic, setTopic] = useState(topics[0]);
+  const [topic, setTopic] = useState<string>(topics[0]);
+  const [customTopic, setCustomTopic] = useState("");
+  const isCustomTopic = topic === "__custom__";
   const [battleType, setBattleType] = useState<typeof battleTypes[number]>("casual");
   const [mode, setMode] = useState<typeof modes[number]>("text");
   const [rounds, setRounds] = useState(3);
@@ -38,13 +40,24 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const resolvedTopic = isCustomTopic ? customTopic.trim() : topic;
+    if (isCustomTopic && resolvedTopic.length < 1) {
+      setError("Enter a topic name.");
+      return;
+    }
+    if (resolvedTopic.length > 60) {
+      setError("Topic must be 60 characters or fewer.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await fetch("/api/battles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, topic, battleType, mode, rounds }),
+        body: JSON.stringify({ title, topic: resolvedTopic, battleType, mode, rounds }),
       });
 
       const data = await res.json();
@@ -116,7 +129,22 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
                   {t}
                 </option>
               ))}
+              <option value="__custom__">Custom topic...</option>
             </select>
+
+            {isCustomTopic && (
+              <input
+                type="text"
+                required
+                minLength={1}
+                maxLength={60}
+                autoFocus
+                value={customTopic}
+                onChange={(e) => setCustomTopic(e.target.value)}
+                placeholder="e.g. Pineapple on Pizza"
+                className="mt-2 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

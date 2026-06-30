@@ -27,6 +27,9 @@ export const metadata: Metadata = {
     "Ragebait is an AI-powered competitive roast battle platform. Compete in roast battles and debates, earn Aura, and climb the leaderboards.",
 };
 
+// Root layout only owns <html>/<body> and global font/css setup now.
+// Route groups (app) and (auth) each provide their own chrome below this,
+// so logged-out auth pages never render the dashboard Sidebar/Navbar/Footer.
 export default function RootLayout({
   children,
 }: {

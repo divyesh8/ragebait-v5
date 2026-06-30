@@ -26,7 +26,9 @@ interface ChallengeFormProps {
 export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
   const [toUsername, setToUsername] = useState("");
   const [title, setTitle] = useState("");
-  const [topic, setTopic] = useState(topics[0]);
+  const [topic, setTopic] = useState<string>(topics[0]);
+  const [customTopic, setCustomTopic] = useState("");
+  const isCustomTopic = topic === "__custom__";
   const [mode, setMode] = useState<typeof modes[number]>("text");
   const [rounds, setRounds] = useState(3);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,17 @@ export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    const resolvedTopic = isCustomTopic ? customTopic.trim() : topic;
+    if (isCustomTopic && resolvedTopic.length < 1) {
+      setError("Enter a topic name.");
+      return;
+    }
+    if (resolvedTopic.length > 60) {
+      setError("Topic must be 60 characters or fewer.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -46,7 +59,7 @@ export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
         body: JSON.stringify({
           toUsername: toUsername.replace(/^@/, ""),
           title,
-          topic,
+          topic: resolvedTopic,
           mode,
           rounds,
           battleType: "friend",
@@ -137,7 +150,21 @@ export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
                     {t}
                   </option>
                 ))}
+                <option value="__custom__">Custom topic...</option>
               </select>
+              {isCustomTopic && (
+                <input
+                  type="text"
+                  required
+                  minLength={1}
+                  maxLength={60}
+                  autoFocus
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  placeholder="e.g. Pineapple on Pizza"
+                  className="mt-2 w-full rounded-xl border border-line bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
+                />
+              )}
             </div>
             <div>
               <label htmlFor="cmode" className="block text-sm font-medium text-white/70">
