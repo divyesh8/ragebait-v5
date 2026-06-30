@@ -5,6 +5,9 @@ import { groupSchema } from "@/lib/validation";
 
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
 
   try {
     const rows = await sql`
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
         (SELECT COUNT(*)::int FROM group_members gm WHERE gm.group_id = g.id) AS member_count,
         EXISTS (
           SELECT 1 FROM group_members mine
-          WHERE mine.group_id = g.id AND mine.user_id = ${session?.userId ?? null}
+          WHERE mine.group_id = g.id AND mine.user_id = ${session.userId}
         ) AS is_member
       FROM rage_groups g
       LEFT JOIN users creator ON creator.id = g.created_by

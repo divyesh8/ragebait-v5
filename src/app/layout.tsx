@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-import Sidebar from "@/components/layout/Sidebar";
-import Footer from "@/components/layout/Footer";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -29,6 +26,9 @@ export const metadata: Metadata = {
     "Ragebait is an AI-powered competitive roast battle platform. Compete in roast battles and debates, earn Aura, and climb the leaderboards.",
 };
 
+// Root layout only owns <html>/<body> and global font/css setup now.
+// Route groups (app) and (auth) each provide their own chrome below this,
+// so logged-out auth pages never render the dashboard Sidebar/Navbar/Footer.
 export default function RootLayout({
   children,
 }: {
@@ -37,14 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="font-body bg-atmosphere min-h-screen text-white">
-        <div className="mx-auto flex max-w-[1600px]">
-          <Sidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-        </div>
+        {children}
       </body>
     </html>
   );

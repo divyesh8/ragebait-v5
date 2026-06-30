@@ -42,10 +42,37 @@ module.exports = {
           "0%": { opacity: "0", transform: "translateY(16px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(-4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        cardIn: {
+          "0%": { opacity: "0", transform: "translateY(28px) scale(0.97)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        floatSlow: {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "50%": { transform: "translate(14px, -22px)" },
+        },
+        floatSlower: {
+          "0%, 100%": { transform: "translate(0, 0)" },
+          "50%": { transform: "translate(-18px, 16px)" },
+        },
+        drift: {
+          "0%": { transform: "translateY(0) translateX(0)", opacity: "0" },
+          "10%": { opacity: "0.8" },
+          "90%": { opacity: "0.6" },
+          "100%": { transform: "translateY(-120vh) translateX(20px)", opacity: "0" },
+        },
       },
       animation: {
         pulseGlow: "pulseGlow 2.5s ease-in-out infinite",
         rise: "rise 0.6s ease-out forwards",
+        fadeIn: "fadeIn 0.18s ease-out forwards",
+        cardIn: "cardIn 0.7s cubic-bezier(0.16,1,0.3,1) forwards",
+        floatSlow: "floatSlow 9s ease-in-out infinite",
+        floatSlower: "floatSlower 13s ease-in-out infinite",
+        drift: "drift linear infinite",
       },
     },
   },

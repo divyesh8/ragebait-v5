@@ -39,6 +39,11 @@ async function expireStaleBattles() {
 //   includeDeleted is only honored when creatorId matches the requester's own session — nobody
 //   can pull another user's deleted battle list.
 export async function GET(req: NextRequest) {
+  const session = await getSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const status = req.nextUrl.searchParams.get("status");
   const creatorId = req.nextUrl.searchParams.get("creatorId");
   const includeDeletedParam = req.nextUrl.searchParams.get("includeDeleted") === "true";
@@ -46,8 +51,7 @@ export async function GET(req: NextRequest) {
   try {
     await expireStaleBattles();
 
-    const session = includeDeletedParam ? await getSessionFromRequest(req) : null;
-    const includeDeleted = includeDeletedParam && Boolean(session) && session!.userId === creatorId;
+    const includeDeleted = includeDeletedParam && session.userId === creatorId;
 
     const rows = creatorId
       ? includeDeleted

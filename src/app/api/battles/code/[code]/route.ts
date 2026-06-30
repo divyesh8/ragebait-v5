@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 import { battleCodeSchema } from "@/lib/validation";
 
 // GET /api/battles/code/:code — look up a battle by its short shareable code
@@ -7,6 +8,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { code: string } }
 ) {
+  const session = await getSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const parsed = battleCodeSchema.safeParse({ code: params.code });
   if (!parsed.success) {
     return NextResponse.json({ error: "Enter a valid battle code." }, { status: 400 });

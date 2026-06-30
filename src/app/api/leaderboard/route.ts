@@ -1,8 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { getSessionFromRequest } from "@/lib/auth";
 
 // GET /api/leaderboard — top users ranked by Aura
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const session = await getSessionFromRequest(req);
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   try {
     const rows = await sql`
       SELECT username, avatar_url, aura, wins, losses
