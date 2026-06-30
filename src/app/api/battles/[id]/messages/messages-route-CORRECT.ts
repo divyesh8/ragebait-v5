@@ -101,3 +101,8 @@ export async function POST(
       message: inserted[0],
       readyForJudging,
     });
+  } catch (err) {
+    console.error("Post battle message error:", err);
+    return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
+  }
+}
