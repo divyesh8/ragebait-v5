@@ -1,27 +1,60 @@
 import Link from "next/link";
-import Card from "@/components/ui/Card";
+import { Suspense } from "react";
 import LoginForm from "@/components/auth/LoginForm";
+import AuthBackdrop from "@/components/auth/AuthBackdrop";
+
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-6 py-12">
-      <h1 className="font-display text-3xl font-bold text-center">
-        Welcome back to <span className="text-gradient">Ragebait</span>
-      </h1>
-      <p className="mt-2 text-center text-sm text-white/50">
-        Log in with your username or email
-      </p>
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-12">
+      <AuthBackdrop />
 
-      <Card className="mt-8">
-        <LoginForm />
-      </Card>
+      <div className="relative z-10 w-full max-w-md animate-cardIn">
+        {/* Logo */}
+        <div className="mb-8 flex justify-center">
+          <Link href="/login" className="font-display text-2xl font-bold tracking-tight text-white">
+            RAGE<span className="text-gradient">BAIT</span>
+          </Link>
+        </div>
 
-      <p className="mt-6 text-center text-sm text-white/50">
-        New to Ragebait?{" "}
-        <Link href="/signup" className="text-aura-blue hover:underline">
-          Create an account
-        </Link>
-      </p>
+        {/* Glass card */}
+        <div className="group relative rounded-3xl p-[1px] transition-all duration-500">
+          {/* Animated gradient border glow */}
+          <div className="absolute -inset-px rounded-3xl bg-gradient-to-br from-aura-purple/60 via-aura-blue/30 to-aura-crimson/40 opacity-60 blur-[2px] transition-opacity duration-500 group-hover:opacity-90" />
+
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-surface2/40 px-8 py-10 backdrop-blur-2xl shadow-[0_8px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-10">
+            {/* Top sheen */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+            <div className="text-center">
+              <h1 className="font-display text-2xl font-bold text-white sm:text-3xl">
+                Welcome back to <span className="text-gradient">Ragebait</span>
+              </h1>
+              <p className="mt-2 text-sm text-white/50">
+                Enter the arena. Claim your Aura.
+              </p>
+            </div>
+
+            <div className="mt-8">
+              <Suspense fallback={null}>
+                <LoginForm />
+              </Suspense>
+            </div>
+
+            <p className="mt-8 text-center text-sm text-white/40">
+              New to Ragebait?{" "}
+              <Link href="/signup" className="font-medium text-aura-blue transition hover:text-white hover:underline">
+                Create an account
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-8 text-center text-xs text-white/25">
+          By entering, you agree to keep the roasts competitive, not cruel.
+        </p>
+      </div>
     </div>
   );
 }
