@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
+import Sidebar from "@/components/layout/Sidebar";
 import Footer from "@/components/layout/Footer";
 
 const display = Space_Grotesk({
@@ -35,10 +36,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="font-body bg-void min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        <Footer />
+      <body className="font-body bg-atmosphere min-h-screen text-white">
+        <div className="mx-auto flex max-w-[1600px]">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </div>
       </body>
     </html>
   );

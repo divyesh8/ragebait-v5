@@ -57,20 +57,32 @@ export default function Navbar() {
   return (
     <>
       <header className={clsx(
-        "sticky top-0 z-50 transition-all duration-300",
-        scrolled
-          ? "border-b border-line bg-void/95 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
-          : "border-b border-line/40 bg-void/80 backdrop-blur-md"
+        "sticky top-0 z-50 transition-all duration-300 glass-nav",
+        scrolled && "shadow-[0_4px_30px_rgba(0,0,0,0.5)]"
       )}>
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-6 py-3 lg:px-8">
 
-          {/* ── Logo ── */}
-          <Link href="/" className="font-display text-xl font-bold tracking-tight shrink-0">
+          {/* ── Logo (mobile only — sidebar has it on desktop) ── */}
+          <Link href="/" className="font-display text-xl font-bold tracking-tight shrink-0 lg:hidden">
             RAGE<span className="text-gradient">BAIT</span>
           </Link>
 
-          {/* ── Desktop nav ── */}
-          <nav className="hidden items-center gap-1 md:flex">
+          {/* ── Search ── */}
+          <div className="hidden flex-1 max-w-md md:flex">
+            <div className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/40 transition focus-within:border-aura-purple/50 focus-within:bg-white/[0.07]">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M21 21l-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search battles, users, topics..."
+                className="w-full bg-transparent text-white placeholder:text-white/30 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* ── Desktop nav (collapses once sidebar takes over at lg) ── */}
+          <nav className="hidden items-center gap-1 md:flex lg:hidden">
             {navLinks.map((link) => {
               const active = pathname.startsWith(link.href);
               return (
@@ -85,7 +97,7 @@ export default function Navbar() {
           </nav>
 
           {/* ── Right side ── */}
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
 
             {/* Loading skeleton — prevents flicker */}
             {loading ? (
@@ -102,11 +114,18 @@ export default function Navbar() {
                   <AuraBadge value={user.aura} size="sm" trend="neutral" />
                 </Link>
 
+                {/* Notifications bell */}
+                <button className="relative hidden h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/50 transition hover:border-aura-purple/40 hover:text-white sm:flex">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </button>
+
                 {/* Avatar + dropdown */}
                 <div ref={dropdownRef} className="relative">
                   <button
                     onClick={() => setDropdownOpen((v) => !v)}
-                    className="flex items-center gap-2 rounded-xl border border-line/60 bg-surface2/70 px-3 py-2 text-sm font-medium text-white/80 transition-all hover:border-aura-purple/50 hover:bg-surface2"
+                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white/80 backdrop-blur-md transition-all hover:border-aura-purple/50 hover:bg-white/10"
                   >
                     <img src={avatarUrl} alt={user.username} className="h-5 w-5 rounded-full" />
                     <span className="hidden sm:inline max-w-[90px] truncate">{user.username}</span>
@@ -117,13 +136,13 @@ export default function Navbar() {
 
                   {/* Dropdown menu */}
                   {dropdownOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-line bg-surface2 py-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.7)] animate-fadeIn">
+                    <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-aura-purple/15 bg-surface2/90 backdrop-blur-xl py-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.7)] animate-fadeIn">
                       {/* User info header */}
                       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
                         <img src={avatarUrl} alt={user.username} className="h-9 w-9 rounded-full" />
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{user.username}</p>
-                          <AuraBadge value={user.aura} size="sm" trend="neutral" />
+                          <AuraBadge value={user.aura} size="xs" trend="neutral" />
                         </div>
                       </div>
                       <Link href="/profile"  onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-colors">
@@ -193,7 +212,7 @@ export default function Navbar() {
                   <img src={avatarUrl} alt={user.username} className="h-10 w-10 rounded-full" />
                   <div>
                     <p className="font-semibold text-sm">{user.username}</p>
-                    <AuraBadge value={user.aura} size="sm" trend="neutral" />
+                    <AuraBadge value={user.aura} size="xs" trend="neutral" />
                   </div>
                 </div>
               )}

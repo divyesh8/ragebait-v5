@@ -49,9 +49,53 @@ textarea:focus-visible {
   color: transparent;
 }
 
+/* Glass panel — frosted, layered, glowing edge */
 .card-surface {
-  background-color: #0e0b17;
-  border: 1px solid #2a2440;
+  background: linear-gradient(
+    180deg,
+    rgba(22, 18, 38, 0.6) 0%,
+    rgba(14, 11, 23, 0.55) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(166, 91, 255, 0.16);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.glass-panel {
+  background: rgba(14, 11, 23, 0.5);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(166, 91, 255, 0.14);
+}
+
+.glass-nav {
+  background: rgba(5, 3, 10, 0.65);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-bottom: 1px solid rgba(166, 91, 255, 0.14);
+}
+
+.glow-ring-purple {
+  box-shadow: 0 0 0 1px rgba(166, 91, 255, 0.4), 0 0 24px rgba(166, 91, 255, 0.25);
+}
+.glow-ring-blue {
+  box-shadow: 0 0 0 1px rgba(61, 220, 255, 0.4), 0 0 24px rgba(61, 220, 255, 0.2);
+}
+.glow-ring-crimson {
+  box-shadow: 0 0 0 1px rgba(255, 46, 85, 0.4), 0 0 24px rgba(255, 46, 85, 0.22);
+}
+
+/* Atmospheric background — sits behind the whole app */
+.bg-atmosphere {
+  background-color: #05030a;
+  background-image:
+    radial-gradient(circle at 15% 10%, rgba(166, 91, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(61, 220, 255, 0.08), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(255, 46, 85, 0.06), transparent 50%);
+  background-attachment: fixed;
 }
 
 @media (prefers-reduced-motion: reduce) {
