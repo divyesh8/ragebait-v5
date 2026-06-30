@@ -109,9 +109,21 @@ export async function PATCH(
   }
 }
 
-// DELETE /api/battles/:id — owner-only hard delete. Only allowed for battles that
-// never had a real opponent engagement (waiting / cancelled / expired), so we never
-// erase an opponent's match history out from under them.
+// DELETE /api/battles/:id — owner-only SOFT delete.
+//
+// This never removes a row from the database. It only flips the battle to
+// status = 'deleted' and stamps deleted_at / deleted_by, so:
+//   - it disappears from the public feed / search / recommendations
+//     (GET /api/battles already filters out status = 'deleted')
+//   - it stays fully intact in the database: title, topic, creator,
+//     participants, messages, AI scores, winner, aura changes, created_at
+//   - it's still fetchable directly via GET /api/battles/:id so the creator's
+//     profile history and the battle's own page can keep showing it
+//     (the frontend renders a read-only "Battle Removed" state for it)
+//
+// The creator can delete at any point in the battle's lifecycle (waiting,
+// active, judging, completed, cancelled, expired) — the only thing that
+// blocks deletion is the battle already being deleted.
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -131,15 +143,22 @@ export async function DELETE(
     if (existing[0].created_by !== session.userId) {
       return NextResponse.json({ error: "Only the battle creator can delete it." }, { status: 403 });
     }
-    if (!["waiting", "cancelled", "expired"].includes(existing[0].status)) {
-      return NextResponse.json(
-        { error: "Battles that already have an opponent can't be deleted, only cancelled before that point." },
-        { status: 409 }
-      );
+    if (existing[0].status === "deleted") {
+      return NextResponse.json({ error: "This battle has already been deleted." }, { status: 409 });
     }
 
-    await sql`DELETE FROM battles WHERE id = ${params.id}`;
-    return NextResponse.json({ success: true });
+    const rows = await sql`
+      UPDATE battles
+      SET status = 'deleted', deleted_at = now(), deleted_by = ${session.userId}
+      WHERE id = ${params.id} AND status != 'deleted'
+      RETURNING id, status, deleted_at
+    `;
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "This battle has already been deleted." }, { status: 409 });
+    }
+
+    return NextResponse.json({ success: true, battle: rows[0] });
   } catch (err) {
     console.error("Delete battle error:", err);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });

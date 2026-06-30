@@ -33,14 +33,53 @@ async function expireStaleBattles() {
   `;
 }
 
-// GET /api/battles?status=waiting|active|completed  (omit status to get everything except cancelled/expired)
+// GET /api/battles?status=waiting|active|completed  (omit status to get everything except cancelled/expired/deleted)
+// GET /api/battles?creatorId=<id>&includeDeleted=true — used by a user's own profile history,
+//   so their deleted battles still show up there even though they're hidden from the public feed.
+//   includeDeleted is only honored when creatorId matches the requester's own session — nobody
+//   can pull another user's deleted battle list.
 export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get("status");
+  const creatorId = req.nextUrl.searchParams.get("creatorId");
+  const includeDeletedParam = req.nextUrl.searchParams.get("includeDeleted") === "true";
 
   try {
     await expireStaleBattles();
 
-    const rows = status
+    const session = includeDeletedParam ? await getSessionFromRequest(req) : null;
+    const includeDeleted = includeDeletedParam && Boolean(session) && session!.userId === creatorId;
+
+    const rows = creatorId
+      ? includeDeleted
+        ? await sql`
+            SELECT
+              b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+              b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+              b.deleted_at, b.deleted_by,
+              creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+            FROM battles b
+            JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN users opponent ON opponent.id = b.opponent_id
+            WHERE b.created_by = ${creatorId}
+            ORDER BY b.created_at DESC
+            LIMIT 50
+          `
+        : await sql`
+            SELECT
+              b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+              b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+              b.deleted_at, b.deleted_by,
+              creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+            FROM battles b
+            JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN users opponent ON opponent.id = b.opponent_id
+            WHERE b.created_by = ${creatorId} AND b.status != 'deleted'
+            ORDER BY b.created_at DESC
+            LIMIT 50
+          `
+      : status
       ? await sql`
           SELECT
             b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
@@ -63,7 +102,7 @@ export async function GET(req: NextRequest) {
           FROM battles b
           JOIN users creator ON creator.id = b.created_by
           LEFT JOIN users opponent ON opponent.id = b.opponent_id
-          WHERE b.status NOT IN ('cancelled', 'expired')
+          WHERE b.status NOT IN ('cancelled', 'expired', 'deleted')
           ORDER BY b.created_at DESC
           LIMIT 50
         `;

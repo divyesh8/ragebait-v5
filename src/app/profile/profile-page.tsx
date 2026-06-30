@@ -65,7 +65,7 @@ export default function ProfilePage() {
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false));
 
-    fetch("/api/battles")
+    fetch(`/api/battles?creatorId=${user.id}&includeDeleted=true`)
       .then((r) => r.json())
       .then((d) => {
         const all: BattleItem[] = d.battles ?? [];
@@ -104,7 +104,11 @@ export default function ProfilePage() {
     try {
       const res = await fetch(`/api/battles/${battleId}`, { method: "DELETE" });
       if (res.ok) {
-        setBattles((prev) => prev.filter((b) => b.id !== battleId));
+        // Soft delete — keep the battle in the list (history is preserved),
+        // just flip its status so the UI reflects the removal.
+        setBattles((prev) =>
+          prev.map((b) => (b.id === battleId ? { ...b, status: "deleted" } : b))
+        );
       }
     } catch {}
     setDeletingId(null);
@@ -323,10 +327,11 @@ export default function ProfilePage() {
             battles.map((battle) => {
               const isWin  = battle.winner_id === user.id;
               const isLoss = battle.status === "completed" && battle.winner_id && !isWin;
-              const canDelete = battle.status === "waiting" || battle.status === "cancelled" || battle.status === "expired";
+              const isDeleted = battle.status === "deleted";
+              const canDelete = !isDeleted;
 
               return (
-                <Card key={battle.id} className="flex items-center gap-4">
+                <Card key={battle.id} className={`flex items-center gap-4 ${isDeleted ? "opacity-50" : ""}`}>
                   <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                     isWin  ? "bg-aura-green/15 text-aura-green border border-aura-green/20" :
                     isLoss ? "bg-aura-crimson/15 text-aura-crimson border border-aura-crimson/20" :
@@ -344,11 +349,12 @@ export default function ProfilePage() {
                       {battle.opponent_username && ` · vs ${battle.opponent_username}`}
                       {" · "}
                       <span className={`capitalize font-medium ${
+                        isDeleted ? "text-aura-crimson" :
                         battle.status === "waiting" ? "text-aura-blue" :
                         battle.status === "active"  ? "text-aura-crimson" :
                         battle.status === "completed" ? "text-white/40" :
                         "text-aura-purple"
-                      }`}>{battle.status}</span>
+                      }`}>{isDeleted ? "Removed" : battle.status}</span>
                     </p>
                   </div>
 
@@ -361,7 +367,9 @@ export default function ProfilePage() {
                       <>
                         {confirmDelete === battle.id ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-white/50">Sure?</span>
+                            <span className="text-xs text-white/50 max-w-[160px] text-right leading-tight">
+                              Removes from public view, keeps your history.
+                            </span>
                             <Button
                               size="sm"
                               variant="danger"
