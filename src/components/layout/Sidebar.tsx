@@ -6,19 +6,36 @@ import clsx from "clsx";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import AuraBadge from "@/components/ui/AuraBadge";
 
-const items = [
-  { href: "/",            label: "Home",        icon: HomeIcon },
-  { href: "/battles",     label: "Battles",      icon: SwordIcon },
-  { href: "/invites",     label: "Challenges",   icon: ShieldIcon },
-  { href: "/groups",      label: "Rage Groups",  icon: UsersIcon },
-  { href: "/leaderboard", label: "Leaderboard",  icon: ChartIcon },
-  { href: "/profile",     label: "Profile",      icon: UserIcon },
-  { href: "/settings",    label: "Settings",     icon: GearIcon },
+// Pages where the sidebar should never appear
+const AUTH_PATHS = ["/login", "/signup"];
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  requiresAuth?: boolean;
+}
+
+const items: NavItem[] = [
+  { href: "/",            label: "Home",        icon: HomeIcon,  requiresAuth: false },
+  { href: "/battles",     label: "Battles",      icon: SwordIcon, requiresAuth: false },
+  { href: "/invites",     label: "Challenges",   icon: ShieldIcon,requiresAuth: true  },
+  { href: "/groups",      label: "Rage Groups",  icon: UsersIcon, requiresAuth: false },
+  { href: "/leaderboard", label: "Leaderboard",  icon: ChartIcon, requiresAuth: false },
+  { href: "/profile",     label: "Profile",      icon: UserIcon,  requiresAuth: true  },
+  { href: "/settings",    label: "Settings",     icon: GearIcon,  requiresAuth: true  },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user } = useCurrentUser();
+  const { user, loading } = useCurrentUser();
+
+  // Hide sidebar entirely on auth pages
+  if (AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return null;
+  }
+
+  const visibleItems = items.filter((item) => !item.requiresAuth || user);
 
   const avatarUrl = user?.avatar_url ||
     (user ? `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(user.username)}` : "");
@@ -33,51 +50,62 @@ export default function Sidebar() {
           RAGE<span className="text-gradient-rage">BAIT</span>
         </Link>
 
-        {/* Nav items */}
+        {/* Nav items — filtered by auth state */}
         <nav className="flex-1 space-y-0.5">
-          {items.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href) ?? false;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
-                  active
-                    ? "bg-aura-purple/12 text-white border border-aura-purple/25 shadow-[0_0_20px_rgba(255,30,30,0.15)]"
-                    : "text-white/45 hover:bg-white/5 hover:text-white border border-transparent"
-                )}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-aura-purple shadow-[0_0_10px_rgba(255,30,30,0.9)]" />
-                )}
-                <Icon className={clsx(
-                  "h-[18px] w-[18px] shrink-0 transition-colors",
-                  active ? "text-aura-purple drop-shadow-[0_0_6px_rgba(255,30,30,0.8)]" : "text-white/35 group-hover:text-white/80"
-                )} />
-                <span>{item.label}</span>
-                {active && (
-                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-aura-purple shadow-[0_0_6px_rgba(255,30,30,0.9)]" />
-                )}
-              </Link>
-            );
-          })}
+          {loading ? (
+            // Skeleton while auth state resolves (avoids flicker of wrong items)
+            <div className="space-y-1 px-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 animate-pulse rounded-xl bg-white/5" />
+              ))}
+            </div>
+          ) : (
+            visibleItems.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href) ?? false;
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+                    active
+                      ? "bg-aura-purple/12 text-white border border-aura-purple/25 shadow-[0_0_20px_rgba(255,30,30,0.15)]"
+                      : "text-white/45 hover:bg-white/5 hover:text-white border border-transparent"
+                  )}
+                >
+                  {active && (
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-aura-purple shadow-[0_0_10px_rgba(255,30,30,0.9)]" />
+                  )}
+                  <Icon className={clsx(
+                    "h-[18px] w-[18px] shrink-0 transition-colors",
+                    active ? "text-aura-purple drop-shadow-[0_0_6px_rgba(255,30,30,0.8)]" : "text-white/35 group-hover:text-white/80"
+                  )} />
+                  <span>{item.label}</span>
+                  {active && (
+                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-aura-purple shadow-[0_0_6px_rgba(255,30,30,0.9)]" />
+                  )}
+                </Link>
+              );
+            })
+          )}
         </nav>
 
-        {/* Create battle CTA */}
-        <div className="my-3 px-1">
-          <Link
-            href="/battles"
-            className="glossy-highlight flex w-full items-center justify-center gap-2 rounded-xl bg-aura-gradient px-4 py-3 text-sm font-bold text-white shadow-glow transition-all hover:shadow-[0_0_40px_rgba(255,30,30,0.65)] hover:-translate-y-0.5 active:scale-95"
-          >
-            <span className="text-base">⚔️</span>
-            Create Rage Battle
-          </Link>
-        </div>
-
-        {/* User card */}
+        {/* Create battle CTA — only shown when logged in */}
         {user && (
+          <div className="my-3 px-1">
+            <Link
+              href="/battles"
+              className="glossy-highlight flex w-full items-center justify-center gap-2 rounded-xl bg-aura-gradient px-4 py-3 text-sm font-bold text-white shadow-glow transition-all hover:shadow-[0_0_40px_rgba(255,30,30,0.65)] hover:-translate-y-0.5 active:scale-95"
+            >
+              <span className="text-base">⚔️</span>
+              Create Rage Battle
+            </Link>
+          </div>
+        )}
+
+        {/* User card (logged in) */}
+        {user ? (
           <Link
             href="/profile"
             className="mt-1 flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 transition-all hover:border-aura-purple/35 hover:bg-white/[0.06] hover:shadow-[0_0_20px_rgba(255,30,30,0.12)] group"
@@ -94,7 +122,23 @@ export default function Sidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </Link>
-        )}
+        ) : !loading ? (
+          /* Guest CTA — shown when not loading and not logged in */
+          <div className="mt-1 space-y-2 px-1">
+            <Link
+              href="/login"
+              className="flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-white/60 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="glossy-highlight flex w-full items-center justify-center rounded-xl bg-aura-gradient px-4 py-2.5 text-sm font-bold text-white shadow-glow-sm transition hover:shadow-glow active:scale-95"
+            >
+              Join the Rage
+            </Link>
+          </div>
+        ) : null}
       </div>
     </aside>
   );
