@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   try {
     await expireStaleBattles();
 
-    const includeDeleted = includeDeletedParam && session.userId === creatorId;
+    const includeDeleted = includeDeletedParam && session?.userId === creatorId;
 
     const rows = creatorId
       ? includeDeleted
