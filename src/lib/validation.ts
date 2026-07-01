@@ -119,3 +119,7 @@ export const battleEditSchema = z
 export const avatarSelectSchema = z.object({
   avatarId: z.string().min(1, "Pick an avatar"),
 });
+
+export const interestsUpdateSchema = z.object({
+  interests: z.array(z.string().min(1)).max(20),
+});
