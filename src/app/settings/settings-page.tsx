@@ -338,7 +338,7 @@ function InterestsSection() {
     <Card>
       <h2 className="font-display text-lg font-semibold">Interests</h2>
       <p className="mt-1 text-sm text-white/50">
-        Pick the topics you care about — your "For You" feed and battle notifications are built around these.
+        Pick the topics you care about — your &ldquo;For You&rdquo; feed and battle notifications are built around these.
       </p>
 
       {loading ? (
