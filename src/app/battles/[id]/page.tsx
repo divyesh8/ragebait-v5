@@ -21,6 +21,13 @@ interface BattleDetail {
   ai_scores: {
     creator?: Record<string, number>;
     opponent?: Record<string, number>;
+    battleAnalysis?: {
+      strongestArgument?: string;
+      weakestArgument?: string;
+      turningPoint?: string;
+      bestComeback?: string;
+      finalSummary?: string;
+    };
     feedback?: { creator?: string; opponent?: string };
   } | null;
   created_at: string;
@@ -52,10 +59,8 @@ function avatarFor(username: string, avatarUrl: string | null) {
 }
 
 const scoreLabels: Record<string, string> = {
-  humor: "Humor", creativity: "Creativity", originality: "Originality",
-  topicRelevance: "Topic Relevance", timing: "Timing",
-  comebackQuality: "Comeback Quality", confidence: "Confidence",
-  wordplay: "Wordplay", consistency: "Consistency", total: "Total",
+  creativity: "Creativity", logic: "Logic", humor: "Humor", originality: "Originality",
+  comeback: "Comeback", entertainment: "Entertainment", total: "Total",
 };
 
 function useCountdown(expiresAt: string | null, active: boolean) {
@@ -392,22 +397,65 @@ export default function BattleDetailPage() {
                       {isWinner && <span className="text-sm">🏆</span>}
                     </div>
                     <div className="space-y-1.5">
-                      {Object.entries(scores).map(([key, value]) => (
+                      {Object.entries(scores)
+                        .filter(([key]) => key !== "total")
+                        .map(([key, value]) => (
                         <div key={key} className="flex items-center justify-between">
                           <span className="text-xs text-white/45">{scoreLabels[key] ?? key}</span>
                           <div className="flex items-center gap-2">
                             <div className="w-16 h-1 rounded-full bg-white/8 overflow-hidden">
-                              <div className={`h-full rounded-full ${isWinner ? "bg-aura-purple shadow-[0_0_6px_rgba(255,30,30,0.7)]" : "bg-white/40"}`} style={{ width: `${Math.min(100, (value / 10) * 100)}%` }} />
+                              <div className={`h-full rounded-full ${isWinner ? "bg-aura-purple shadow-[0_0_6px_rgba(255,30,30,0.7)]" : "bg-white/40"}`} style={{ width: `${Math.min(100, value)}%` }} />
                             </div>
                             <span className={`font-mono text-xs font-bold ${isWinner ? "text-aura-purple" : "text-white/60"}`}>{value}</span>
                           </div>
                         </div>
                       ))}
+                      {typeof scores.total === "number" && (
+                        <div className="flex items-center justify-between border-t border-white/8 pt-1.5 mt-1.5">
+                          <span className="text-xs font-semibold text-white/60">Total</span>
+                          <span className={`font-mono text-xs font-bold ${isWinner ? "text-aura-purple" : "text-white/60"}`}>{scores.total}</span>
+                        </div>
+                      )}
                     </div>
                     {feedback && <p className="mt-3 text-xs italic text-white/40 leading-relaxed">{feedback}</p>}
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {battle.ai_scores?.battleAnalysis && (
+            <div className="mt-5 space-y-3 border-t border-white/8 pt-4">
+              <h3 className="font-display text-sm font-black text-white/80">Battle Analysis</h3>
+              {battle.ai_scores.battleAnalysis.finalSummary && (
+                <p className="text-sm text-white/60 leading-relaxed">{battle.ai_scores.battleAnalysis.finalSummary}</p>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {battle.ai_scores.battleAnalysis.strongestArgument && (
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                    <p className="text-xs font-semibold text-white/70">💪 Strongest Argument</p>
+                    <p className="mt-1 text-xs text-white/50 leading-relaxed">{battle.ai_scores.battleAnalysis.strongestArgument}</p>
+                  </div>
+                )}
+                {battle.ai_scores.battleAnalysis.bestComeback && (
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                    <p className="text-xs font-semibold text-white/70">🔥 Best Comeback</p>
+                    <p className="mt-1 text-xs text-white/50 leading-relaxed">{battle.ai_scores.battleAnalysis.bestComeback}</p>
+                  </div>
+                )}
+                {battle.ai_scores.battleAnalysis.turningPoint && (
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                    <p className="text-xs font-semibold text-white/70">⚡ Turning Point</p>
+                    <p className="mt-1 text-xs text-white/50 leading-relaxed">{battle.ai_scores.battleAnalysis.turningPoint}</p>
+                  </div>
+                )}
+                {battle.ai_scores.battleAnalysis.weakestArgument && (
+                  <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                    <p className="text-xs font-semibold text-white/70">📉 Weakest Argument</p>
+                    <p className="mt-1 text-xs text-white/50 leading-relaxed">{battle.ai_scores.battleAnalysis.weakestArgument}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
