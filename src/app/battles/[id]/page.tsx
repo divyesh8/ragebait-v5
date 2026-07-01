@@ -374,7 +374,7 @@ export default function BattleDetailPage() {
             <span className="text-xl">🤖</span>
             <h2 className="font-display text-lg font-black">AI Judge Verdict</h2>
           </div>
-          <p className="text-sm text-white/65 leading-relaxed italic">"{battle.ai_summary}"</p>
+          <p className="text-sm text-white/65 leading-relaxed italic">&ldquo;{battle.ai_summary}&rdquo;</p>
 
           {battle.ai_scores && (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">

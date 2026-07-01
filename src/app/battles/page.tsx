@@ -264,7 +264,7 @@ function BattleCard({
 
       {battle.ai_summary && (
         <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3 text-xs text-white/50 italic leading-relaxed">
-          "{battle.ai_summary}"
+          &ldquo;{battle.ai_summary}&rdquo;
         </div>
       )}
 
