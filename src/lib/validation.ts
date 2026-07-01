@@ -121,5 +121,5 @@ export const avatarSelectSchema = z.object({
 });
 
 export const interestsUpdateSchema = z.object({
-  interests: z.array(z.string().min(1)).max(20),
+  categoryIds: z.array(z.string().min(1)).max(20),
 });
