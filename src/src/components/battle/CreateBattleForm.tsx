@@ -36,40 +36,6 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
   const [rounds, setRounds] = useState(3);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiIdea, setAiIdea] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiSides, setAiSides] = useState<{ sideA: string; sideB: string } | null>(null);
-
-  async function handleAiSuggest() {
-    if (aiIdea.trim().length < 3) {
-      setAiError("Give the assistant a bit more to work with.");
-      return;
-    }
-    setAiError(null);
-    setAiLoading(true);
-    try {
-      const res = await fetch("/api/battles/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiIdea.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAiError(data.error ?? "Could not generate a suggestion.");
-        setAiLoading(false);
-        return;
-      }
-      setTitle(data.suggestion.title);
-      setTopic("__custom__");
-      setCustomTopic(data.suggestion.topic);
-      setAiSides({ sideA: data.suggestion.sideA, sideB: data.suggestion.sideB });
-    } catch {
-      setAiError("Could not reach the assistant. Please try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -130,32 +96,6 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
               {error}
             </div>
           )}
-
-          <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
-            <label htmlFor="aiIdea" className="block text-sm font-medium text-white/70">
-              ✨ Not sure what to fight about? Ask the AI assistant
-            </label>
-            <div className="mt-1.5 flex gap-2">
-              <input
-                id="aiIdea"
-                type="text"
-                value={aiIdea}
-                onChange={(e) => setAiIdea(e.target.value)}
-                placeholder="e.g. Make a debate about smartphones"
-                className="flex-1 rounded-xl border border-white/8 bg-white/[0.04] px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus-visible:border-aura-purple"
-              />
-              <Button type="button" variant="secondary" size="sm" onClick={handleAiSuggest} disabled={aiLoading}>
-                {aiLoading ? "Thinking…" : "Suggest"}
-              </Button>
-            </div>
-            {aiError && <p className="mt-2 text-xs text-aura-purple">{aiError}</p>}
-            {aiSides && (
-              <div className="mt-3 space-y-1.5 text-xs text-white/60">
-                <p><span className="font-semibold text-white/80">Side A:</span> {aiSides.sideA}</p>
-                <p><span className="font-semibold text-white/80">Side B:</span> {aiSides.sideB}</p>
-              </div>
-            )}
-          </div>
 
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-white/70">

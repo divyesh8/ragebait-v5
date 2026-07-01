@@ -67,7 +67,7 @@ export async function POST(
       return NextResponse.json({ error: "This battle has already been judged." }, { status: 409 });
     }
 
-    if (battle.status !== "judging" && battle.status !== "pending_review") {
+    if (battle.status !== "judging") {
       return NextResponse.json(
         { error: "This battle isn't ready for judging yet. Both participants must finish all rounds first." },
         { status: 409 }
@@ -150,30 +150,14 @@ export async function POST(
       });
     }
 
-    let judgeResult: JudgeResult;
-    try {
-      judgeResult = await runAiJudge({
-        topic: battle.topic,
-        title: battle.title,
-        creatorName: battle.creator_username,
-        opponentName: battle.opponent_username,
-        creatorMessages,
-        opponentMessages,
-      });
-    } catch (aiErr) {
-      // AI call failed, timed out, or returned malformed JSON. Don't leave the
-      // battle stuck in "judging" forever or silently 500 — park it for a
-      // human/retry pass so it's easy to find and re-run later.
-      console.error("AI judge call failed, marking battle for review:", aiErr);
-      await sql`UPDATE battles SET status = 'pending_review' WHERE id = ${id}`;
-      return NextResponse.json(
-        {
-          error: "The AI judge couldn't reach a verdict right now. This battle has been queued for review — try again shortly.",
-          status: "pending_review",
-        },
-        { status: 202 }
-      );
-    }
+    const judgeResult = await runAiJudge({
+      topic: battle.topic,
+      title: battle.title,
+      creatorName: battle.creator_username,
+      opponentName: battle.opponent_username,
+      creatorMessages,
+      opponentMessages,
+    });
 
     const winnerId =
       judgeResult.winner === "creator"

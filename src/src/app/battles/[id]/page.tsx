@@ -14,7 +14,7 @@ interface BattleDetail {
   topic: string;
   battle_type: string;
   mode: string;
-  status: "waiting" | "active" | "judging" | "pending_review" | "completed" | "cancelled" | "expired" | "deleted";
+  status: "waiting" | "active" | "judging" | "completed" | "cancelled" | "expired" | "deleted";
   rounds: number;
   winner_id: string | null;
   ai_summary: string | null;
@@ -139,7 +139,6 @@ export default function BattleDetailPage() {
       const res = await fetch(`/api/battles/${battleId}/judge`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not judge this battle."); setJudging(false); return; }
-      if (res.status === 202) { setError(data.error ?? "The AI judge is still working on this one — try again shortly."); }
       await load();
     } catch { setError("Could not reach the server."); }
     finally { setJudging(false); }
@@ -375,7 +374,7 @@ export default function BattleDetailPage() {
             <span className="text-xl">🤖</span>
             <h2 className="font-display text-lg font-black">AI Judge Verdict</h2>
           </div>
-          <p className="text-sm text-white/65 leading-relaxed italic">&ldquo;{battle.ai_summary}&rdquo;</p>
+          <p className="text-sm text-white/65 leading-relaxed italic">"{battle.ai_summary}"</p>
 
           {battle.ai_scores && (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -414,23 +413,17 @@ export default function BattleDetailPage() {
       )}
 
       {/* Judging prompt */}
-      {(battle.status === "judging" || battle.status === "pending_review") && isParticipant && (
+      {battle.status === "judging" && isParticipant && (
         <div className="mb-5 card-surface rounded-2xl p-6 text-center">
           <span className="text-4xl">🤖</span>
-          <p className="mt-3 font-display text-lg font-black">
-            {battle.status === "pending_review" ? "Judge Hiccuped — Retry" : "Ready to Judge"}
-          </p>
-          <p className="mt-1 text-sm text-white/50">
-            {battle.status === "pending_review"
-              ? "The AI judge couldn't reach a verdict last time. Give it another shot."
-              : "Both players are done. Run the AI to decide the winner."}
-          </p>
+          <p className="mt-3 font-display text-lg font-black">Ready to Judge</p>
+          <p className="mt-1 text-sm text-white/50">Both players are done. Run the AI to decide the winner.</p>
           <Button className="mt-4" onClick={handleJudge} disabled={judging}>
             {judging ? "Judging…" : "⚡ Run AI Judge"}
           </Button>
         </div>
       )}
-      {(battle.status === "judging" || battle.status === "pending_review") && !isParticipant && (
+      {battle.status === "judging" && !isParticipant && (
         <div className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-center text-sm text-white/40">
           Awaiting AI judging…
         </div>

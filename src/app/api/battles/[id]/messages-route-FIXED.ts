@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { moderateBattleMessage } from "@/lib/moderation";
 import { z } from "zod";
 
 const messageSchema = z.object({
@@ -65,17 +64,6 @@ export async function POST(
       return NextResponse.json(
         { error: `You've already posted all ${battle.rounds} of your roasts for this battle.` },
         { status: 409 }
-      );
-    }
-
-    // AI moderation gate — run before the message ever touches the DB.
-    // Local rules first (instant), then an OpenAI moderation pass if a key
-    // is configured. Blocked content is never persisted.
-    const moderation = await moderateBattleMessage(parsed.data.content);
-    if (!moderation.allowed) {
-      return NextResponse.json(
-        { error: moderation.reason ?? "This message violates Ragebait rules." },
-        { status: 422 }
       );
     }
 
