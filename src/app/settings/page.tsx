@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -275,6 +275,108 @@ function EmailSection({ currentEmail }: { currentEmail: string }) {
   );
 }
 
+interface TopicCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+function InterestsSection() {
+  const [categories, setCategories] = useState<TopicCategory[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/topics").then((r) => r.json()),
+      fetch("/api/interests").then((r) => r.json()),
+    ])
+      .then(([topicsData, interestsData]) => {
+        setCategories(topicsData.categories ?? []);
+        setSelected(new Set(interestsData.categoryIds ?? []));
+      })
+      .catch(() => setError("Could not load topics."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/interests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryIds: Array.from(selected) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not save interests.");
+        return;
+      }
+      setSuccess("Your interests have been updated.");
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="font-display text-lg font-semibold">Interests</h2>
+      <p className="mt-1 text-sm text-white/50">
+        Pick the topics you care about — your "For You" feed and battle notifications are built around these.
+      </p>
+
+      {loading ? (
+        <p className="mt-4 text-sm text-white/40">Loading topics...</p>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap gap-2.5">
+            {categories.map((cat) => {
+              const active = selected.has(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => toggle(cat.id)}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                    active
+                      ? "border-aura-purple bg-aura-purple/20 text-white glow-ring-purple"
+                      : "border-white/10 bg-white/5 text-white/60 hover:border-aura-purple/40 hover:text-white"
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
+
+          <FieldError message={error} />
+          <FieldSuccess message={success} />
+
+          <Button size="sm" className="mt-4" onClick={save} disabled={saving}>
+            {saving ? "Saving..." : "Save interests"}
+          </Button>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { user, loading } = useCurrentUser();
 
@@ -297,6 +399,7 @@ export default function SettingsPage() {
       <p className="mt-2 text-white/50">Manage your username, password, and email.</p>
 
       <div className="mt-8 space-y-6">
+        <InterestsSection />
         <UsernameSection currentUsername={user.username} />
         <PasswordSection />
         <EmailSection currentEmail={user.email} />

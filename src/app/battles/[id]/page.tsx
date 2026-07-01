@@ -1,20 +1,23 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import clsx from "clsx";
 
 interface BattleDetail {
   id: string;
   battle_code: string;
   title: string;
   topic: string;
+  description: string | null;
   battle_type: string;
+  battle_style: string;
   mode: string;
-  status: "waiting" | "active" | "judging" | "completed" | "cancelled" | "expired" | "deleted";
+  status: "waiting" | "active" | "judging" | "completed" | "cancelled" | "expired";
   rounds: number;
   winner_id: string | null;
   ai_summary: string | null;
@@ -27,8 +30,6 @@ interface BattleDetail {
   started_at: string | null;
   completed_at: string | null;
   expires_at: string | null;
-  deleted_at: string | null;
-  deleted_by: string | null;
   creator_id: string;
   creator_username: string;
   creator_avatar: string;
@@ -88,7 +89,8 @@ function useCountdown(expiresAt: string | null, active: boolean) {
 
 export default function BattleDetailPage() {
   const params = useParams();
-  const battleId = params?.id as string;
+  const router = useRouter();
+  const battleId = params.id as string;
   const { user } = useCurrentUser();
 
   const [battle, setBattle] = useState<BattleDetail | null>(null);
@@ -104,7 +106,6 @@ export default function BattleDetailPage() {
   const [editTopic, setEditTopic] = useState("");
   const [editRounds, setEditRounds] = useState(3);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -133,13 +134,16 @@ export default function BattleDetailPage() {
   // ran at all while waiting for an opponent.
   useEffect(() => {
     if (!battle) return;
-    const terminal = ["completed", "cancelled", "expired", "deleted"];
+    const terminal = ["completed", "cancelled", "expired"];
     if (terminal.includes(battle.status)) return;
     const interval = setInterval(load, 4000);
     return () => clearInterval(interval);
   }, [battle, load]);
 
-  const countdown = useCountdown(battle?.expires_at ?? null, battle?.status === "waiting");
+  const countdown = useCountdown(
+    battle?.expires_at ?? null,
+    battle?.status === "waiting" || battle?.status === "active"
+  );
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -207,6 +211,7 @@ export default function BattleDetailPage() {
   }
 
   async function handleDelete() {
+    if (!confirm("Delete this battle permanently? This can't be undone.")) return;
     setActionBusy(true);
     setError(null);
     try {
@@ -216,10 +221,7 @@ export default function BattleDetailPage() {
         setError(data.error ?? "Could not delete this battle.");
         return;
       }
-      setShowDeleteModal(false);
-      // Reload in place rather than navigating away — the page now renders
-      // the read-only "Battle Removed" state for status === "deleted".
-      await load();
+      router.push("/battles");
     } catch {
       setError("Could not reach the server.");
     } finally {
@@ -298,10 +300,21 @@ export default function BattleDetailPage() {
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-3xl font-bold">{battle.title}</h1>
-        <span className="rounded-full bg-surface2 px-3 py-1 text-xs font-medium uppercase tracking-wide text-aura-purple">
-          {battle.topic}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-surface2 px-3 py-1 text-xs font-medium uppercase tracking-wide text-aura-purple">
+            {battle.topic}
+          </span>
+          {battle.status === "expired" && (
+            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white/40">
+              Expired
+            </span>
+          )}
+        </div>
       </div>
+
+      {battle.description && (
+        <p className="mt-3 text-sm text-white/50">{battle.description}</p>
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-white/40">
         <button
@@ -317,9 +330,18 @@ export default function BattleDetailPage() {
             Expires in {countdown} if nobody joins
           </span>
         )}
+        {battle.status === "active" && countdown && (
+          <span className={clsx("flex items-center gap-1.5 font-medium", countdown.startsWith("0:") ? "text-aura-crimson" : "text-aura-blue")}>
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+            Live · {countdown} remaining
+          </span>
+        )}
         {battle.status === "cancelled" && <span>This battle was cancelled.</span>}
-        {battle.status === "expired" && <span>This battle expired — nobody joined in time.</span>}
-        {battle.status === "deleted" && <span className="text-aura-crimson">This battle was removed by its creator.</span>}
+        {battle.status === "expired" && (
+          <span className="text-white/40">
+            Battle expired{battle.completed_at ? "" : " — nobody joined in time"}. This battle is now read-only.
+          </span>
+        )}
       </div>
 
       <div className="mt-4 flex items-center gap-4">
@@ -349,15 +371,15 @@ export default function BattleDetailPage() {
           <Button variant="danger" size="sm" onClick={handleCancel} disabled={actionBusy}>
             Cancel battle
           </Button>
-          <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={actionBusy}>
+          <Button variant="danger" size="sm" onClick={handleDelete} disabled={actionBusy}>
             Delete
           </Button>
         </div>
       )}
-      {isOwner && battle.status !== "waiting" && battle.status !== "deleted" && (
+      {isOwner && ["cancelled", "expired"].includes(battle.status) && (
         <div className="mt-4">
-          <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)} disabled={actionBusy}>
-            Delete Battle
+          <Button variant="danger" size="sm" onClick={handleDelete} disabled={actionBusy}>
+            Delete
           </Button>
         </div>
       )}
@@ -404,16 +426,6 @@ export default function BattleDetailPage() {
         <div className="mt-4 rounded-xl border border-aura-crimson/40 bg-aura-crimson/10 px-4 py-3 text-sm text-aura-crimson">
           {error}
         </div>
-      )}
-
-      {battle.status === "deleted" && (
-        <Card className="mt-6 border-aura-crimson/30 text-center">
-          <h2 className="font-display text-lg font-bold text-aura-crimson">Battle Removed</h2>
-          <p className="mt-2 text-sm text-white/60">
-            This battle was removed by its creator and is no longer publicly active. The full
-            history below — roasts, results, and stats — is preserved for the record.
-          </p>
-        </Card>
       )}
 
       {/* AI summary / scores once completed */}
@@ -525,26 +537,6 @@ export default function BattleDetailPage() {
         <p className="mt-6 text-center text-sm text-white/40">
           Waiting for an opponent to join this battle.
         </p>
-      )}
-
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <Card className="w-full max-w-sm text-center">
-            <h2 className="font-display text-lg font-bold">Delete this battle?</h2>
-            <p className="mt-2 text-sm text-white/60">
-              This removes the battle from public view but keeps it in your battle history.
-            </p>
-            {error && <p className="mt-3 text-sm text-aura-crimson">{error}</p>}
-            <div className="mt-5 flex justify-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(false)} disabled={actionBusy}>
-                Cancel
-              </Button>
-              <Button variant="danger" size="sm" onClick={handleDelete} disabled={actionBusy}>
-                {actionBusy ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </Card>
-        </div>
       )}
     </div>
   );

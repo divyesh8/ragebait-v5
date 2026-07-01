@@ -34,7 +34,7 @@ export async function POST(
 
   try {
     const battleRows = await sql`
-      SELECT id, created_by, opponent_id, status, rounds
+      SELECT id, created_by, opponent_id, status, rounds, expires_at
       FROM battles WHERE id = ${id} LIMIT 1
     `;
 
@@ -43,6 +43,12 @@ export async function POST(
     }
 
     const battle = battleRows[0];
+
+    // Lazily expire if the window passed since the last read.
+    if (battle.status === "active" && new Date(battle.expires_at).getTime() < Date.now()) {
+      await sql`UPDATE battles SET status = 'expired' WHERE id = ${id} AND status = 'active'`;
+      return NextResponse.json({ error: "This battle has expired and is now read-only." }, { status: 409 });
+    }
 
     if (battle.status !== "active") {
       return NextResponse.json({ error: "This battle is not currently live." }, { status: 409 });

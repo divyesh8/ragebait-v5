@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 interface JudgeScore {
   humor: number;
@@ -135,9 +136,11 @@ export async function POST(
         await applyAuraChange(loserId, AURA_LOSS, "Battle Loss", id);
         await sql`UPDATE users SET wins = wins + 1, current_streak = current_streak + 1, best_streak = GREATEST(best_streak, current_streak + 1) WHERE id = ${winnerId}`;
         await sql`UPDATE users SET losses = losses + 1, current_streak = 0 WHERE id = ${loserId}`;
+        await notifyBattleResult(battle, winnerId);
       } else {
         await applyAuraChange(battle.created_by, 5, "Battle Draw", id);
         await applyAuraChange(battle.opponent_id, 5, "Battle Draw", id);
+        await notifyBattleResult(battle, null);
       }
 
       return NextResponse.json({
@@ -203,10 +206,12 @@ export async function POST(
         UPDATE users SET losses = losses + 1, current_streak = 0
         WHERE id = ${loserId}
       `;
+      await notifyBattleResult(battle, winnerId);
     } else {
       // Draw — small participation Aura for both, no streak changes.
       await applyAuraChange(battle.created_by, 5, "Battle Draw", id);
       await applyAuraChange(battle.opponent_id, 5, "Battle Draw", id);
+      await notifyBattleResult(battle, null);
     }
 
     return NextResponse.json({
@@ -228,6 +233,39 @@ async function applyAuraChange(userId: string, amount: number, reason: string, b
     INSERT INTO aura_transactions (user_id, amount, reason, battle_id)
     VALUES (${userId}, ${amount}, ${reason}, ${battleId})
   `;
+}
+
+/** Notify both participants once a battle is judged. winnerId is null for a draw. */
+async function notifyBattleResult(
+  battle: Record<string, any>,
+  winnerId: string | null
+) {
+  const winnerName = winnerId === battle.created_by
+    ? battle.creator_username
+    : winnerId === battle.opponent_id
+    ? battle.opponent_username
+    : null;
+
+  const body = winnerName
+    ? `${winnerName} won: ${battle.title}`
+    : `${battle.title} ended in a draw`;
+
+  await Promise.all([
+    createNotification({
+      userId: battle.created_by,
+      type: "winner_announced",
+      title: "Battle results are in",
+      body,
+      battleId: battle.id,
+    }),
+    createNotification({
+      userId: battle.opponent_id,
+      type: "winner_announced",
+      title: "Battle results are in",
+      body,
+      battleId: battle.id,
+    }),
+  ]);
 }
 
 async function runAiJudge(input: {

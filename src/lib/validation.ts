@@ -38,7 +38,7 @@ export const loginSchema = z.object({
 });
 
 export const profileUpdateSchema = z.object({
-  bio: z.string().max(300, "Bio must be at most 300 characters").optional().default(""),
+  bio: z.string().max(300, "Bio must be at most 300 characters").nullable().optional(),
   avatarUrl: z.string().url("Enter a valid URL").optional().or(z.literal("")),
 });
 
@@ -51,10 +51,18 @@ export const groupSchema = z.object({
 
 export const battleCreateSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(140),
-  topic: z.string().min(1).max(60),
+  topic: z.string().min(1, "Enter a topic").max(60),
+  description: z.string().max(500, "Description must be at most 500 characters").optional(),
   battleType: z.enum(["casual", "ranked", "friend", "tournament", "group", "event"]),
+  battleStyle: z.enum(["debate", "roast", "prediction", "opinion", "meme"]).default("debate"),
+  topicCategoryId: z.string().uuid().optional().nullable(),
+  isCustomTopic: z.boolean().optional().default(false),
   mode: z.enum(["text", "image", "meme"]),
   rounds: z.number().int().min(1).max(5),
+});
+
+export const interestsUpdateSchema = z.object({
+  categoryIds: z.array(z.string().uuid()).max(20),
 });
 
 export const battleCodeSchema = z.object({

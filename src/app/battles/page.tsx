@@ -62,10 +62,11 @@ export default function BattlesPage() {
   const [codeInput, setCodeInput] = useState("");
   const [codeSearching, setCodeSearching] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [feed, setFeed] = useState<"foryou" | "discover">("foryou");
 
-  const loadBattles = useCallback(async () => {
+  const loadBattles = useCallback(async (feedMode: "foryou" | "discover") => {
     try {
-      const res = await fetch("/api/battles");
+      const res = await fetch(`/api/battles?feed=${feedMode}`);
       const data = await res.json();
       setBattles(data.battles ?? []);
     } catch {
@@ -76,11 +77,10 @@ export default function BattlesPage() {
   }, []);
 
   useEffect(() => {
-    loadBattles();
-    // Light polling so "waiting" cards flip to "active" without a manual refresh.
-    const interval = setInterval(loadBattles, 8000);
+    loadBattles(feed);
+    const interval = setInterval(() => loadBattles(feed), 8000);
     return () => clearInterval(interval);
-  }, [loadBattles]);
+  }, [loadBattles, feed]);
 
   async function handleJoin(battleId: string) {
     if (!user) {
@@ -147,6 +147,27 @@ export default function BattlesPage() {
         )}
       </div>
 
+      {user && (
+        <div className="mb-6 flex gap-1 rounded-2xl border border-white/10 bg-white/5 p-1 w-fit backdrop-blur-md">
+          <button
+            onClick={() => setFeed("foryou")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+              feed === "foryou" ? "bg-aura-purple text-void shadow-glow-sm" : "text-white/50 hover:text-white"
+            }`}
+          >
+            For You
+          </button>
+          <button
+            onClick={() => setFeed("discover")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+              feed === "discover" ? "bg-aura-purple text-void shadow-glow-sm" : "text-white/50 hover:text-white"
+            }`}
+          >
+            Discover Battles
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleCodeSearch} className="mb-10 flex flex-wrap items-center gap-2">
         <input
           value={codeInput}
@@ -178,14 +199,22 @@ export default function BattlesPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {battles.map((battle) => (
-            <Card key={battle.id} className="flex flex-col gap-4">
+            <Card
+              key={battle.id}
+              glow={battle.status === "active" ? "crimson" : "none"}
+              className={`flex flex-col gap-4 transition-opacity ${battle.status === "expired" || battle.status === "cancelled" ? "opacity-50 grayscale" : ""}`}
+            >
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-surface2 px-3 py-1 text-xs font-medium uppercase tracking-wide text-aura-purple">
                   {battle.topic}
                 </span>
-                <span className={`text-xs font-semibold uppercase ${statusStyles[battle.status]}`}>
+                <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold uppercase ${
+                  battle.status === "expired"
+                    ? "border border-white/15 bg-white/5 text-white/40"
+                    : statusStyles[battle.status]
+                }`}>
                   {battle.status === "active" && (
-                    <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-pulseGlow rounded-full bg-aura-crimson" />
+                    <span className="inline-block h-1.5 w-1.5 animate-pulseGlow rounded-full bg-aura-crimson" />
                   )}
                   {statusLabels[battle.status]}
                 </span>
@@ -260,7 +289,7 @@ export default function BattlesPage() {
 
       {showCreate && (
         <CreateBattleForm
-          onCreated={loadBattles}
+          onCreated={() => loadBattles(feed)}
           onClose={() => setShowCreate(false)}
         />
       )}
