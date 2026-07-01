@@ -1,63 +1,124 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { battleEditSchema } from "@/lib/validation";
+import { battleCreateSchema } from "@/lib/validation";
 
-// GET /api/battles/:id — full battle detail including messages
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const { id } = params;
+const BATTLE_EXPIRY_MINUTES = 10;
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid ambiguity
+
+function generateBattleCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += CODE_ALPHABET[crypto.randomInt(0, CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+async function generateUniqueBattleCode(): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = generateBattleCode();
+    const existing = await sql`SELECT 1 FROM battles WHERE battle_code = ${code} LIMIT 1`;
+    if (existing.length === 0) return code;
+  }
+  // Astronomically unlikely to ever hit this, but fail loudly rather than silently collide.
+  throw new Error("Could not generate a unique battle code.");
+}
+
+/** Flips any 'waiting' battles past their expiry into 'expired'. Cheap, indexed, runs on every read. */
+async function expireStaleBattles() {
+  await sql`
+    UPDATE battles SET status = 'expired'
+    WHERE status = 'waiting' AND expires_at < now()
+  `;
+}
+
+// GET /api/battles?status=waiting|active|completed  (omit status to get everything except cancelled/expired/deleted)
+// GET /api/battles?creatorId=<id>&includeDeleted=true — used by a user's own profile history,
+//   so their deleted battles still show up there even though they're hidden from the public feed.
+//   includeDeleted is only honored when creatorId matches the requester's own session — nobody
+//   can pull another user's deleted battle list.
+export async function GET(req: NextRequest) {
+  // Public endpoint — no auth required for reading battles.
+  // We still read the session so we can honour includeDeleted for the owner.
+  const session = await getSessionFromRequest(req);
+
+  const status = req.nextUrl.searchParams.get("status");
+  const creatorId = req.nextUrl.searchParams.get("creatorId");
+  const includeDeletedParam = req.nextUrl.searchParams.get("includeDeleted") === "true";
 
   try {
-    // Lazily expire if this specific battle's window passed — covers both
-    // 'waiting' (nobody joined in time) and 'active' (the match itself ran out).
-    await sql`
-      UPDATE battles SET status = 'expired'
-      WHERE id = ${id} AND status IN ('waiting', 'active') AND expires_at < now()
-    `;
+    await expireStaleBattles();
 
-    const battleRows = await sql`
-      SELECT
-        b.id, b.battle_code, b.title, b.topic, b.description, b.battle_type, b.battle_style,
-        b.is_custom_topic, b.mode, b.status,
-        b.rounds, b.winner_id, b.ai_summary, b.ai_scores,
-        b.created_at, b.started_at, b.completed_at, b.expires_at,
-        creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
-        opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
-      FROM battles b
-      JOIN users creator ON creator.id = b.created_by
-      LEFT JOIN users opponent ON opponent.id = b.opponent_id
-      WHERE b.id = ${id}
-      LIMIT 1
-    `;
+    const includeDeleted = includeDeletedParam && session.userId === creatorId;
 
-    if (battleRows.length === 0) {
-      return NextResponse.json({ error: "Battle not found." }, { status: 404 });
-    }
+    const rows = creatorId
+      ? includeDeleted
+        ? await sql`
+            SELECT
+              b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+              b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+              b.deleted_at, b.deleted_by,
+              creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+            FROM battles b
+            JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN users opponent ON opponent.id = b.opponent_id
+            WHERE b.created_by = ${creatorId}
+            ORDER BY b.created_at DESC
+            LIMIT 50
+          `
+        : await sql`
+            SELECT
+              b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+              b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+              b.deleted_at, b.deleted_by,
+              creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+            FROM battles b
+            JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN users opponent ON opponent.id = b.opponent_id
+            WHERE b.created_by = ${creatorId} AND b.status != 'deleted'
+            ORDER BY b.created_at DESC
+            LIMIT 50
+          `
+      : status
+      ? await sql`
+          SELECT
+            b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+            creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+            opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+          FROM battles b
+          JOIN users creator ON creator.id = b.created_by
+          LEFT JOIN users opponent ON opponent.id = b.opponent_id
+          WHERE b.status = ${status}
+          ORDER BY b.created_at DESC
+          LIMIT 50
+        `
+      : await sql`
+          SELECT
+            b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
+            b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
+            creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+            opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
+          FROM battles b
+          JOIN users creator ON creator.id = b.created_by
+          LEFT JOIN users opponent ON opponent.id = b.opponent_id
+          WHERE b.status NOT IN ('cancelled', 'expired', 'deleted')
+          ORDER BY b.created_at DESC
+          LIMIT 50
+        `;
 
-    const messageRows = await sql`
-      SELECT m.id, m.content, m.round, m.created_at,
-             u.id AS user_id, u.username, u.avatar_url
-      FROM battle_messages m
-      JOIN users u ON u.id = m.user_id
-      WHERE m.battle_id = ${id}
-      ORDER BY m.created_at ASC
-    `;
-
-    return NextResponse.json({ battle: battleRows[0], messages: messageRows });
+    return NextResponse.json({ battles: rows });
   } catch (err) {
-    console.error("Get battle error:", err);
+    console.error("List battles error:", err);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
 }
 
-// PATCH /api/battles/:id — owner-only edit (title/topic/rounds), only while still 'waiting'
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// POST /api/battles — create a new battle, status 'waiting', auto-expires in 10 minutes if nobody joins
+export async function POST(req: NextRequest) {
   const session = await getSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -70,80 +131,27 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const parsed = battleEditSchema.safeParse(body);
+  const parsed = battleCreateSchema.safeParse(body);
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
     return NextResponse.json({ error: firstError?.message ?? "Invalid input." }, { status: 400 });
   }
 
-  try {
-    const existing = await sql`
-      SELECT created_by, status FROM battles WHERE id = ${params.id} LIMIT 1
-    `;
-    if (existing.length === 0) {
-      return NextResponse.json({ error: "Battle not found." }, { status: 404 });
-    }
-    if (existing[0].created_by !== session.userId) {
-      return NextResponse.json({ error: "Only the battle creator can edit it." }, { status: 403 });
-    }
-    if (existing[0].status !== "waiting") {
-      return NextResponse.json(
-        { error: "You can only edit a battle while it's still waiting for an opponent." },
-        { status: 409 }
-      );
-    }
+  const { title, topic, battleType, mode, rounds } = parsed.data;
 
-    const { title, topic, rounds } = parsed.data;
+  try {
+    const battleCode = await generateUniqueBattleCode();
+    const expiresAt = new Date(Date.now() + BATTLE_EXPIRY_MINUTES * 60 * 1000);
+
     const rows = await sql`
-      UPDATE battles
-      SET
-        title  = COALESCE(${title ?? null}, title),
-        topic  = COALESCE(${topic ?? null}, topic),
-        rounds = COALESCE(${rounds ?? null}, rounds)
-      WHERE id = ${params.id}
-      RETURNING id, title, topic, rounds, battle_code, status
+      INSERT INTO battles (title, topic, battle_type, mode, status, created_by, rounds, battle_code, expires_at)
+      VALUES (${title}, ${topic}, ${battleType}, ${mode}, 'waiting', ${session.userId}, ${rounds}, ${battleCode}, ${expiresAt.toISOString()})
+      RETURNING id, battle_code, title, topic, battle_type, mode, status, rounds, created_at, expires_at
     `;
 
-    return NextResponse.json({ battle: rows[0] });
+    return NextResponse.json({ battle: rows[0] }, { status: 201 });
   } catch (err) {
-    console.error("Edit battle error:", err);
-    return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
-  }
-}
-
-// DELETE /api/battles/:id — owner-only hard delete. Only allowed for battles that
-// never had a real opponent engagement (waiting / cancelled / expired), so we never
-// erase an opponent's match history out from under them.
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const session = await getSessionFromRequest(req);
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-
-  try {
-    const existing = await sql`
-      SELECT created_by, status FROM battles WHERE id = ${params.id} LIMIT 1
-    `;
-    if (existing.length === 0) {
-      return NextResponse.json({ error: "Battle not found." }, { status: 404 });
-    }
-    if (existing[0].created_by !== session.userId) {
-      return NextResponse.json({ error: "Only the battle creator can delete it." }, { status: 403 });
-    }
-    if (!["waiting", "cancelled", "expired"].includes(existing[0].status)) {
-      return NextResponse.json(
-        { error: "Battles that already have an opponent can't be deleted, only cancelled before that point." },
-        { status: 409 }
-      );
-    }
-
-    await sql`DELETE FROM battles WHERE id = ${params.id}`;
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Delete battle error:", err);
+    console.error("Create battle error:", err);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
 }

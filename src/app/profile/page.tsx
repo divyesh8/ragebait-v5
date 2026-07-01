@@ -57,7 +57,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) { setHistoryLoading(false); setBattlesLoading(false); return; }
-    setBioValue(user.bio || "");
+    setBioValue(user.bio ?? "");
 
     fetch("/api/aura/history")
       .then((r) => r.json())
@@ -65,7 +65,7 @@ export default function ProfilePage() {
       .catch(() => setHistory([]))
       .finally(() => setHistoryLoading(false));
 
-    fetch("/api/battles")
+    fetch(`/api/battles?creatorId=${user.id}&includeDeleted=true`)
       .then((r) => r.json())
       .then((d) => {
         const all: BattleItem[] = d.battles ?? [];
@@ -104,7 +104,11 @@ export default function ProfilePage() {
     try {
       const res = await fetch(`/api/battles/${battleId}`, { method: "DELETE" });
       if (res.ok) {
-        setBattles((prev) => prev.filter((b) => b.id !== battleId));
+        // Soft delete — keep the battle in the list (history is preserved),
+        // just flip its status so the UI reflects the removal.
+        setBattles((prev) =>
+          prev.map((b) => (b.id === battleId ? { ...b, status: "deleted" } : b))
+        );
       }
     } catch {}
     setDeletingId(null);
@@ -196,7 +200,11 @@ export default function ProfilePage() {
       {showAvatarPicker && (
         <AvatarPicker
           currentAvatarUrl={avatarUrl}
-          onSelected={(newUrl) => { setAvatarOverride(newUrl); setShowAvatarPicker(false); }}
+          onSelected={async (newUrl) => {
+            setAvatarOverride(newUrl);
+            setShowAvatarPicker(false);
+            await refresh();
+          }}
           onClose={() => setShowAvatarPicker(false)}
         />
       )}
@@ -215,14 +223,14 @@ export default function ProfilePage() {
               className="w-full rounded-xl border border-aura-purple/50 bg-surface2 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-aura-purple/30 resize-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveBio(); }
-                if (e.key === "Escape") { setEditingBio(false); setBioValue(user.bio || ""); }
+                if (e.key === "Escape") { setEditingBio(false); setBioValue(user.bio ?? ""); }
               }}
             />
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={saveBio} disabled={bioSaving}>
                 {bioSaving ? "Saving..." : "Save"}
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => { setEditingBio(false); setBioValue(user.bio || ""); }}>
+              <Button size="sm" variant="secondary" onClick={() => { setEditingBio(false); setBioValue(user.bio ?? ""); }}>
                 Cancel
               </Button>
               <span className="ml-auto text-xs text-white/25 font-mono">{bioValue.length}/160</span>
@@ -238,7 +246,6 @@ export default function ProfilePage() {
             <p className="text-white/60 text-sm leading-relaxed flex-1">
               {user.bio || <span className="italic text-white/25">No bio yet — click to add one</span>}
             </p>
-            {/* Edit pencil icon */}
             <svg className="h-4 w-4 flex-shrink-0 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
@@ -320,11 +327,11 @@ export default function ProfilePage() {
             battles.map((battle) => {
               const isWin  = battle.winner_id === user.id;
               const isLoss = battle.status === "completed" && battle.winner_id && !isWin;
-              const canDelete = battle.status === "waiting" || battle.status === "cancelled" || battle.status === "expired";
+              const isDeleted = battle.status === "deleted";
+              const canDelete = !isDeleted;
 
               return (
-                <Card key={battle.id} className="flex items-center gap-4">
-                  {/* Result indicator */}
+                <Card key={battle.id} className={`flex items-center gap-4 ${isDeleted ? "opacity-50" : ""}`}>
                   <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                     isWin  ? "bg-aura-green/15 text-aura-green border border-aura-green/20" :
                     isLoss ? "bg-aura-crimson/15 text-aura-crimson border border-aura-crimson/20" :
@@ -333,7 +340,6 @@ export default function ProfilePage() {
                     {isWin ? "W" : isLoss ? "L" : "—"}
                   </div>
 
-                  {/* Battle info */}
                   <div className="flex-1 min-w-0">
                     <Link href={`/battles/${battle.id}`} className="hover:text-aura-purple transition-colors">
                       <p className="text-sm font-semibold truncate">{battle.title}</p>
@@ -343,33 +349,35 @@ export default function ProfilePage() {
                       {battle.opponent_username && ` · vs ${battle.opponent_username}`}
                       {" · "}
                       <span className={`capitalize font-medium ${
+                        isDeleted ? "text-aura-crimson" :
                         battle.status === "waiting" ? "text-aura-blue" :
                         battle.status === "active"  ? "text-aura-crimson" :
                         battle.status === "completed" ? "text-white/40" :
                         "text-aura-purple"
-                      }`}>{battle.status}</span>
+                      }`}>{isDeleted ? "Removed" : battle.status}</span>
                     </p>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <Link href={`/battles/${battle.id}`}>
-                      <Button size="sm" variant="secondary">View</Button>
+                     <Button size="sm" variant="secondary">View</Button>
                     </Link>
 
                     {canDelete && (
                       <>
                         {confirmDelete === battle.id ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-white/50">Sure?</span>
+                            <span className="text-xs text-white/50 max-w-[160px] text-right leading-tight">
+                              Removes from public view, keeps your history.
+                            </span>
                             <Button
-                               size="sm"
-                               variant="danger"
-                               disabled={deletingId === battle.id}
-                               onClick={() => deleteBattle(battle.id)}
->
-                               {deletingId === battle.id ? "Deleting..." : "Delete"}
-                                </Button>
+                              size="sm"
+                              variant="danger"
+                              disabled={deletingId === battle.id}
+                              onClick={() => deleteBattle(battle.id)}
+                            >
+                              {deletingId === battle.id ? "Deleting..." : "Delete"}
+                            </Button>
                             <button
                               onClick={() => setConfirmDelete(null)}
                               className="text-xs text-white/40 hover:text-white px-1"
