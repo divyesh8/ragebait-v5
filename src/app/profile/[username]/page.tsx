@@ -111,7 +111,7 @@ export default function PublicProfilePage() {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             <h1 className="font-display text-2xl font-bold">{profile.username}</h1>
-            <AuraBadge aura={profile.aura} />
+            <AuraBadge value={profile.aura} />
           </div>
           <p className="mt-1 text-xs text-white/40">Level {profile.level}</p>
           {profile.bio && (
