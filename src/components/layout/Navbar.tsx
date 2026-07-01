@@ -142,19 +142,21 @@ export default function Navbar() {
             RAGE<span className="text-gradient">BAIT</span>
           </Link>
 
-          {/* ── Search ── */}
-          <div className="hidden flex-1 max-w-md md:flex">
-            <div className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/40 transition focus-within:border-aura-purple/50 focus-within:bg-white/[0.07]">
-              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M21 21l-4.3-4.3" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search battles, users, topics..."
-                className="w-full bg-transparent text-white placeholder:text-white/30 focus:outline-none"
-              />
+          {/* ── Search (logged-in users only) ── */}
+          {user && (
+            <div className="hidden flex-1 max-w-md md:flex">
+              <div className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/40 transition focus-within:border-aura-purple/50 focus-within:bg-white/[0.07]">
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M21 21l-4.3-4.3" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search battles, users, topics..."
+                  className="w-full bg-transparent text-white placeholder:text-white/30 focus:outline-none"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Desktop nav (collapses once sidebar takes over at lg) ── */}
           <nav className="hidden items-center gap-1 md:flex lg:hidden">
