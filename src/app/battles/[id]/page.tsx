@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
@@ -54,6 +54,30 @@ interface BattleMessage {
   avatar_url: string;
 }
 
+interface ScoreSet {
+  creativity: number; logic: number; humor: number;
+  originality: number; comeback: number; entertainment: number;
+}
+
+interface CoachingResult {
+  strengths: string[];
+  weaknesses: string[];
+  repeatedMistakes: string[];
+  improvementSuggestions: string[];
+  practiceGoal: string;
+  coachFeedback: string;
+  playstyle: string;
+  scores: ScoreSet;
+  progression: { metric: keyof ScoreSet; from: number; to: number }[] | null;
+  profile: {
+    totalReviews: number;
+    averages: ScoreSet;
+    preferredStyle: string;
+    topStrengths: string[];
+    topWeaknesses: string[];
+  };
+}
+
 function avatarFor(username: string, avatarUrl: string | null) {
   return avatarUrl || `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(username)}`;
 }
@@ -100,6 +124,10 @@ export default function BattleDetailPage() {
   const [editRounds, setEditRounds] = useState(3);
   const [codeCopied, setCodeCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [coaching, setCoaching] = useState<CoachingResult | null>(null);
+  const [coachingLoading, setCoachingLoading] = useState(false);
+  const [coachingError, setCoachingError] = useState<string | null>(null);
+  const coachingFetchedRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -120,6 +148,29 @@ export default function BattleDetailPage() {
     const interval = setInterval(load, 4000);
     return () => clearInterval(interval);
   }, [battle, load]);
+
+  // AI Coach — runs once per (user, battle) after the battle is judged.
+  // Never during a live battle: gated on status === "completed". The ref
+  // (not just component state) prevents a duplicate call if this effect
+  // re-runs from an unrelated re-render or dev-mode double-invoke.
+  useEffect(() => {
+    if (!battle || !user) return;
+    const participant = user.id === battle.creator_id || user.id === battle.opponent_id;
+    if (!participant || battle.status !== "completed") return;
+    if (coachingFetchedRef.current === battleId) return;
+    coachingFetchedRef.current = battleId;
+
+    setCoachingLoading(true);
+    setCoachingError(null);
+    fetch(`/api/battles/${battleId}/coach`, { method: "POST" })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) { setCoachingError(data.error ?? "Could not load your AI coaching report."); return; }
+        setCoaching(data);
+      })
+      .catch(() => setCoachingError("Could not reach the server for your AI coaching report."))
+      .finally(() => setCoachingLoading(false));
+  }, [battle, user, battleId]);
 
   const countdown = useCountdown(battle?.expires_at ?? null, battle?.status === "waiting");
 
@@ -457,6 +508,99 @@ export default function BattleDetailPage() {
                     <p className="mt-1 text-xs text-white/50 leading-relaxed">{battle.ai_scores.battleAnalysis.weakestArgument}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Coach — Your Performance (Phase 3). Own section, own data
+          fetch (see the coaching useEffect above) — reads the Judge's
+          already-saved verdict rather than re-scoring anything, and never
+          renders for anyone but a participant of a completed battle. */}
+      {battle.status === "completed" && isParticipant && (
+        <div className="mb-5 card-surface rounded-2xl p-6">
+          <h3 className="font-display text-lg font-black flex items-center gap-2">🎯 Your Performance</h3>
+
+          {coachingLoading && (
+            <p className="mt-3 text-sm text-white/40">Your AI Coach is reviewing this battle…</p>
+          )}
+          {coachingError && !coachingLoading && (
+            <p className="mt-3 text-sm text-aura-purple">{coachingError}</p>
+          )}
+
+          {coaching && !coachingLoading && (
+            <div className="mt-4 space-y-4">
+              <p className="text-sm text-white/70 leading-relaxed italic">{coaching.coachFeedback}</p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                  <p className="text-xs font-semibold text-aura-green">💪 Strengths</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-white/60">
+                    {coaching.strengths.map((s, i) => <li key={i}>• {s}</li>)}
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                  <p className="text-xs font-semibold text-aura-purple">📈 Areas to Improve</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-white/60">
+                    {coaching.weaknesses.map((s, i) => <li key={i}>• {s}</li>)}
+                  </ul>
+                </div>
+              </div>
+
+              {coaching.repeatedMistakes.length > 0 && (
+                <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                  <p className="text-xs font-semibold text-white/70">🔁 Repeated Patterns</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-white/50">
+                    {coaching.repeatedMistakes.map((s, i) => <li key={i}>• {s}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                <p className="text-xs font-semibold text-white/70">💡 Improvement Tips</p>
+                <ul className="mt-1.5 space-y-1 text-xs text-white/50">
+                  {coaching.improvementSuggestions.map((s, i) => <li key={i}>• {s}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-lg border border-aura-purple/30 bg-aura-purple/5 p-3">
+                <p className="text-xs font-semibold text-aura-purple">🎯 Next Goal</p>
+                <p className="mt-1 text-xs text-white/70">{coaching.practiceGoal}</p>
+              </div>
+
+              {coaching.progression && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-white/70">📊 Progress Since Last Battle</p>
+                  <div className="space-y-1.5">
+                    {coaching.progression.map((p) => {
+                      const delta = Math.round((p.to - p.from) * 10) / 10;
+                      return (
+                        <div key={p.metric} className="flex items-center justify-between text-xs">
+                          <span className="text-white/45">{scoreLabels[p.metric] ?? p.metric}</span>
+                          <span className="font-mono">
+                            <span className="text-white/40">{p.from.toFixed(1)}</span>
+                            <span className="mx-1 text-white/25">→</span>
+                            <span className={delta > 0 ? "font-bold text-aura-green" : delta < 0 ? "font-bold text-aura-purple" : "text-white/50"}>
+                              {p.to.toFixed(1)}
+                            </span>
+                            {delta !== 0 && (
+                              <span className={`ml-1 ${delta > 0 ? "text-aura-green" : "text-aura-purple"}`}>
+                                ({delta > 0 ? "+" : ""}{delta})
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-white/8 pt-3 text-xs text-white/40">
+                <span>Playstyle: <span className="font-semibold text-white/70">{coaching.playstyle}</span></span>
+                <span>·</span>
+                <span>{coaching.profile.totalReviews} battle{coaching.profile.totalReviews === 1 ? "" : "s"} reviewed by your AI Coach</span>
               </div>
             </div>
           )}
