@@ -16,6 +16,7 @@ export interface CurrentUser {
   bio: string | null;
   avatar_url: string | null;
   created_at: string;
+  isCreator: boolean;
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────

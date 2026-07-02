@@ -14,10 +14,12 @@ const navLinks = [
   { href: "/invites",     label: "Challenges" },
 ];
 
+const creatorLink = { href: "/creator", label: "Creator Control Panel" };
+
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [scrolled, setScrolled]       = useState(false);
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -87,7 +89,7 @@ export default function Navbar() {
 
           {/* ── Desktop nav ── */}
           <nav className="hidden items-center gap-1 md:flex">
-            {navLinks.map((link) => {
+            {[...navLinks, ...(user?.isCreator ? [creatorLink] : [])].map((link) => {
               const active = pathname.startsWith(link.href);
               return (
                 <Link key={link.href} href={link.href} className={clsx(
@@ -95,6 +97,7 @@ export default function Navbar() {
                   active ? "bg-aura-purple/15 text-white shadow-glow-sm" : "text-white/55 hover:bg-white/5 hover:text-white"
                 )}>
                   {link.label}
+                  {link.href === "/creator" && <span className="ml-1 text-red-200">👑</span>}
                   {active && <span className="absolute -bottom-0.5 left-1/2 h-[2px] w-5 -translate-x-1/2 rounded-full bg-aura-purple shadow-[0_0_8px_rgba(255,30,30,0.9)]" />}
                 </Link>
               );
@@ -118,6 +121,16 @@ export default function Navbar() {
                 <Link href="/profile" className="hidden sm:flex">
                   <AuraBadge value={user.aura} size="sm" trend="neutral" />
                 </Link>
+
+                {user.isCreator && (
+                  <Link
+                    href="/creator"
+                    title="Founder • Full Platform Access"
+                    className="hidden rounded-full border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.22em] text-red-100 shadow-[0_0_20px_rgba(255,43,43,0.25)] transition hover:border-red-300 hover:bg-red-500/20 sm:inline-flex"
+                  >
+                    Creator
+                  </Link>
+                )}
 
                 {/* Notifications bell */}
                 <button className="relative hidden h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 transition hover:border-aura-purple/50 hover:text-white hover:shadow-glow-sm sm:flex">
@@ -150,6 +163,11 @@ export default function Navbar() {
                         <img src={avatarUrl} alt={user.username} className="h-9 w-9 rounded-full ring-2 ring-aura-purple/60" />
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{user.username}</p>
+                          {user.isCreator && (
+                            <p title="Founder • Full Platform Access" className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">
+                              Creator
+                            </p>
+                          )}
                           <AuraBadge value={user.aura} size="xs" trend="neutral" />
                         </div>
                       </div>
@@ -162,6 +180,11 @@ export default function Navbar() {
                       <Link href="/battles"  onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-colors">
                         <span>⚔️</span> My Battles
                       </Link>
+                      {user.isCreator && (
+                        <Link href="/creator" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-100 hover:bg-red-500/10 hover:text-white transition-colors">
+                          <span>👑</span> Creator Control Panel
+                        </Link>
+                      )}
                       <div className="my-1 border-t border-white/8" />
                       <button onClick={handleLogout} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-aura-purple/80 hover:bg-aura-purple/10 hover:text-aura-purple transition-colors">
                         <span>🚪</span> Log out
@@ -227,12 +250,12 @@ export default function Navbar() {
               )}
 
               <nav className="flex-1 space-y-1">
-                {navLinks.map((link) => (
+                {[...navLinks, ...(user?.isCreator ? [creatorLink] : [])].map((link) => (
                   <Link key={link.href} href={link.href} className={clsx(
                     "flex items-center rounded-xl px-4 py-3 text-sm font-medium transition-all",
                     pathname.startsWith(link.href) ? "bg-aura-purple/12 text-white border border-aura-purple/25" : "text-white/60 hover:bg-white/5 hover:text-white"
                   )}>
-                    {link.label}
+                    {link.label}{link.href === "/creator" ? " 👑" : ""}
                   </Link>
                 ))}
                 {user && (

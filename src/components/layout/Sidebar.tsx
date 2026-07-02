@@ -26,8 +26,15 @@ const items: NavItem[] = [
   { href: "/settings",    label: "Settings",     icon: GearIcon,  requiresAuth: true  },
 ];
 
+const creatorItem: NavItem = {
+  href: "/creator",
+  label: "Creator Control",
+  icon: CrownIcon,
+  requiresAuth: true,
+};
+
 export default function Sidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const { user, loading } = useCurrentUser();
 
   // Hide sidebar entirely on auth pages
@@ -35,7 +42,7 @@ export default function Sidebar() {
     return null;
   }
 
-  const visibleItems = items.filter((item) => !item.requiresAuth || user);
+  const visibleItems = [...items, ...(user?.isCreator ? [creatorItem] : [])].filter((item) => !item.requiresAuth || user);
 
   const avatarUrl = user?.avatar_url ||
     (user ? `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(user.username)}` : "");
@@ -116,6 +123,11 @@ export default function Sidebar() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-white">{user.username}</p>
+              {user.isCreator && (
+                <p title="Founder • Full Platform Access" className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200">
+                  Creator
+                </p>
+              )}
               <AuraBadge value={user.aura} size="xs" trend="neutral" />
             </div>
             <svg className="h-4 w-4 text-white/20 group-hover:text-white/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -193,6 +205,14 @@ function GearIcon(props: React.SVGProps<SVGSVGElement>) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.6 1z" />
+    </svg>
+  );
+}
+function CrownIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 8l5 4 4-7 4 7 5-4-2 11H5L3 8z" />
+      <path d="M5 19h14" />
     </svg>
   );
 }

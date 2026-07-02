@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { AUTH_COOKIE_NAME, verifySession } from "@/lib/auth";
+import { isFounderEmail } from "@/lib/creator";
 
 export async function GET(req: NextRequest) {
   const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
@@ -27,7 +28,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ user: null }, { status: 200 });
     }
 
-    return NextResponse.json({ user: rows[0] });
+    const user = rows[0];
+
+    return NextResponse.json({
+      user: {
+        ...user,
+        isCreator: isFounderEmail(user.email),
+      },
+    });
   } catch (err) {
     console.error("Session lookup error:", err);
     return NextResponse.json({ user: null }, { status: 200 });

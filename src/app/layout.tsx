@@ -3,6 +3,7 @@ import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Sidebar from "@/components/layout/Sidebar";
+import CreatorFloatingButton from "@/components/creator/CreatorFloatingButton";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -49,6 +50,7 @@ export default function RootLayout({
             {children}
           </main>
         </div>
+        <CreatorFloatingButton />
       </body>
     </html>
   );
