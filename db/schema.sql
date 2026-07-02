@@ -87,3 +87,79 @@ CREATE TABLE IF NOT EXISTS battle_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_battle_messages_battle ON battle_messages (battle_id, created_at ASC);
+
+-- =========================================================
+-- RAGEMIND AI (PHASE 5)
+-- Human intelligence engine cache and long-term player memory.
+-- =========================================================
+CREATE OR REPLACE FUNCTION merge_jsonb_arrays(left_value jsonb, right_value jsonb)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT COALESCE(jsonb_agg(DISTINCT value), '[]'::jsonb)
+  FROM jsonb_array_elements(COALESCE(left_value, '[]'::jsonb) || COALESCE(right_value, '[]'::jsonb)) AS items(value);
+$$;
+
+CREATE TABLE IF NOT EXISTS rage_mind_analysis_cache (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  battle_id       UUID NOT NULL REFERENCES battles(id) ON DELETE CASCADE,
+  transcript_hash VARCHAR(96) NOT NULL,
+  payload         JSONB NOT NULL,
+  generated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at      TIMESTAMPTZ NOT NULL,
+  UNIQUE (battle_id, transcript_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rage_mind_cache_lookup
+  ON rage_mind_analysis_cache (battle_id, transcript_hash, expires_at DESC);
+
+CREATE TABLE IF NOT EXISTS battle_ragemind_reports (
+  battle_id       UUID PRIMARY KEY REFERENCES battles(id) ON DELETE CASCADE,
+  transcript_hash VARCHAR(96) NOT NULL,
+  payload         JSONB NOT NULL,
+  battle_dna      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  generated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS player_ragemind_memories (
+  user_id               UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  personality_traits    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  emotional_patterns    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  favorite_jokes        JSONB NOT NULL DEFAULT '[]'::jsonb,
+  successful_strategies JSONB NOT NULL DEFAULT '[]'::jsonb,
+  recurring_mistakes    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  cultural_signals      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  favorite_topics        JSONB NOT NULL DEFAULT '[]'::jsonb,
+  best_opponents         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  worst_opponents        JSONB NOT NULL DEFAULT '[]'::jsonb,
+  best_comeback          TEXT NOT NULL DEFAULT '',
+  most_successful_strategy TEXT NOT NULL DEFAULT '',
+  favorite_humor_style   TEXT NOT NULL DEFAULT '',
+  typical_argument_structure TEXT NOT NULL DEFAULT '',
+  growth_timeline        JSONB NOT NULL DEFAULT '[]'::jsonb,
+  player_dna             JSONB NOT NULL DEFAULT '{}'::jsonb,
+  difficult_opponents   JSONB NOT NULL DEFAULT '[]'::jsonb,
+  best_battles          JSONB NOT NULL DEFAULT '[]'::jsonb,
+  worst_battles         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_ragemind_updated
+  ON player_ragemind_memories (updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS battle_dna_snapshots (
+  battle_id    UUID PRIMARY KEY REFERENCES battles(id) ON DELETE CASCADE,
+  dna          JSONB NOT NULL,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS player_dna_snapshots (
+  user_id      UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  dna          JSONB NOT NULL,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_dna_updated
+  ON player_dna_snapshots (updated_at DESC);
