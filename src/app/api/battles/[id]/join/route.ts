@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 // POST /api/battles/:id/join - authenticated user joins an open battle.
 export async function POST(
@@ -21,7 +22,7 @@ export async function POST(
     `;
 
     const existingRows = await sql`
-      SELECT id, created_by, opponent_id, status, expires_at
+      SELECT id, created_by, opponent_id, status, title, expires_at
       FROM battles
       WHERE id = ${id}
       LIMIT 1
@@ -71,6 +72,15 @@ export async function POST(
         { status: 409 }
       );
     }
+
+    await createNotification({
+      userId: battle.created_by,
+      type: "battle_joined",
+      title: "Battle joined",
+      body: `${session.username} joined your battle: ${battle.title}`,
+      battleId: id,
+      actorId: session.userId,
+    });
 
     return NextResponse.json({ success: true, battle: joinedRows[0] });
   } catch (err) {

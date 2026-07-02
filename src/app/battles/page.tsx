@@ -23,6 +23,15 @@ interface BattleListItem {
   creator_id: string;
   creator_username: string;
   creator_avatar: string;
+  creator_playstyle?: string | null;
+  creator_strengths?: string[] | null;
+  creator_weaknesses?: string[] | null;
+  creator_average_creativity?: number | null;
+  creator_average_logic?: number | null;
+  creator_average_humor?: number | null;
+  creator_average_originality?: number | null;
+  creator_average_comeback?: number | null;
+  creator_average_entertainment?: number | null;
   opponent_id: string | null;
   opponent_username: string | null;
   opponent_avatar: string | null;
@@ -39,6 +48,21 @@ const statusConfig: Record<string, { label: string; cls: string; dot?: boolean }
 
 function avatarFor(u: string, url: string | null) {
   return url || `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(u)}`;
+}
+
+function averageCreatorScore(battle: BattleListItem) {
+  const scores = [
+    battle.creator_average_creativity,
+    battle.creator_average_logic,
+    battle.creator_average_humor,
+    battle.creator_average_originality,
+    battle.creator_average_comeback,
+    battle.creator_average_entertainment,
+  ]
+    .map((score) => Number(score) || 0)
+    .filter((score) => score > 0);
+  if (scores.length === 0) return null;
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
 }
 
 export default function BattlesPage() {
@@ -265,6 +289,39 @@ function BattleCard({
       {battle.ai_summary && (
         <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3 text-xs text-white/50 italic leading-relaxed">
           &ldquo;{battle.ai_summary}&rdquo;
+        </div>
+      )}
+
+      {canJoin && (
+        <div className="rounded-xl border border-aura-purple/20 bg-aura-purple/[0.06] p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-black uppercase tracking-wider text-aura-purple">Opponent Insight</p>
+            {averageCreatorScore(battle) !== null && (
+              <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 font-mono text-[11px] text-white/55">
+                avg {averageCreatorScore(battle)}
+              </span>
+            )}
+          </div>
+          <div className="grid gap-2 text-xs text-white/50">
+            <p>
+              Style:{" "}
+              <span className="font-semibold text-white/70">
+                {battle.creator_playstyle ?? "Balanced"}
+              </span>
+            </p>
+            <p>
+              Strong:{" "}
+              <span className="text-white/65">
+                {battle.creator_strengths?.slice(0, 2).join(", ") || "not enough data yet"}
+              </span>
+            </p>
+            <p>
+              Weak:{" "}
+              <span className="text-white/65">
+                {battle.creator_weaknesses?.slice(0, 2).join(", ") || "unknown"}
+              </span>
+            </p>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,14 @@
-import nodemailer from "nodemailer";
+type MailTransporter = {
+  sendMail(input: {
+    from: string | undefined;
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+  }): Promise<unknown>;
+};
 
-let cachedTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+let cachedTransporter: MailTransporter | null = null;
 
 function isEmailConfigured(): boolean {
   return Boolean(
@@ -12,9 +20,10 @@ function isEmailConfigured(): boolean {
   );
 }
 
-function getTransporter() {
+async function getTransporter(): Promise<MailTransporter> {
   if (cachedTransporter) return cachedTransporter;
-  cachedTransporter = nodemailer.createTransport({
+  const nodemailer = await import("nodemailer");
+  cachedTransporter = nodemailer.default.createTransport({
     host: process.env.EMAIL_SERVER_HOST,
     port: Number(process.env.EMAIL_SERVER_PORT),
     secure: Number(process.env.EMAIL_SERVER_PORT) === 465,
@@ -29,23 +38,26 @@ function getTransporter() {
 /**
  * Sends an OTP code to `to`. If EMAIL_SERVER_* env vars aren't configured
  * yet, falls back to logging the code to Vercel's runtime logs instead of
- * throwing — so the rest of the flow is still testable before SMTP is wired
- * up. This fallback is NOT acceptable for real production use; configure
- * real SMTP credentials before launching.
+ * throwing, so the rest of the flow is still testable before SMTP is wired.
  */
 export async function sendOtpEmail(to: string, code: string, purpose: string): Promise<void> {
   if (!isEmailConfigured()) {
     console.warn(
       `[email not configured] Would send OTP ${code} to ${to} for purpose "${purpose}". ` +
-        `Set EMAIL_SERVER_HOST/PORT/USER/PASSWORD and EMAIL_FROM to actually send this.`
+        "Set EMAIL_SERVER_HOST/PORT/USER/PASSWORD and EMAIL_FROM to actually send this."
     );
     return;
   }
 
   const subject =
-    purpose === "email_change" ? "Confirm your new Ragebait email" : "Your Ragebait verification code";
+    purpose === "email_change"
+      ? "Confirm your new Ragebait email"
+      : purpose === "signup"
+        ? "Verify your Ragebait account"
+        : "Your Ragebait verification code";
 
-  await getTransporter().sendMail({
+  const transporter = await getTransporter();
+  await transporter.sendMail({
     from: process.env.EMAIL_FROM,
     to,
     subject,

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { battleCreateSchema } from "@/lib/validation";
+import { notifyRecommendedBattle } from "@/lib/notifications";
 
 const BATTLE_EXPIRY_MINUTES = 10;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid ambiguity
@@ -61,9 +62,19 @@ export async function GET(req: NextRequest) {
               b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
               b.deleted_at, b.deleted_by,
               creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              creator_profile.preferred_battle_style AS creator_playstyle,
+              creator_profile.strengths AS creator_strengths,
+              creator_profile.weaknesses AS creator_weaknesses,
+              creator_profile.average_creativity AS creator_average_creativity,
+              creator_profile.average_logic AS creator_average_logic,
+              creator_profile.average_humor AS creator_average_humor,
+              creator_profile.average_originality AS creator_average_originality,
+              creator_profile.average_comeback AS creator_average_comeback,
+              creator_profile.average_entertainment AS creator_average_entertainment,
               opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
             FROM battles b
             JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN player_ai_profiles creator_profile ON creator_profile.user_id = creator.id
             LEFT JOIN users opponent ON opponent.id = b.opponent_id
             WHERE b.created_by = ${creatorId}
             ORDER BY b.created_at DESC
@@ -75,9 +86,19 @@ export async function GET(req: NextRequest) {
               b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
               b.deleted_at, b.deleted_by,
               creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+              creator_profile.preferred_battle_style AS creator_playstyle,
+              creator_profile.strengths AS creator_strengths,
+              creator_profile.weaknesses AS creator_weaknesses,
+              creator_profile.average_creativity AS creator_average_creativity,
+              creator_profile.average_logic AS creator_average_logic,
+              creator_profile.average_humor AS creator_average_humor,
+              creator_profile.average_originality AS creator_average_originality,
+              creator_profile.average_comeback AS creator_average_comeback,
+              creator_profile.average_entertainment AS creator_average_entertainment,
               opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
             FROM battles b
             JOIN users creator ON creator.id = b.created_by
+            LEFT JOIN player_ai_profiles creator_profile ON creator_profile.user_id = creator.id
             LEFT JOIN users opponent ON opponent.id = b.opponent_id
             WHERE b.created_by = ${creatorId} AND b.status != 'deleted'
             ORDER BY b.created_at DESC
@@ -89,9 +110,19 @@ export async function GET(req: NextRequest) {
             b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
             b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
             creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+            creator_profile.preferred_battle_style AS creator_playstyle,
+            creator_profile.strengths AS creator_strengths,
+            creator_profile.weaknesses AS creator_weaknesses,
+            creator_profile.average_creativity AS creator_average_creativity,
+            creator_profile.average_logic AS creator_average_logic,
+            creator_profile.average_humor AS creator_average_humor,
+            creator_profile.average_originality AS creator_average_originality,
+            creator_profile.average_comeback AS creator_average_comeback,
+            creator_profile.average_entertainment AS creator_average_entertainment,
             opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
           FROM battles b
           JOIN users creator ON creator.id = b.created_by
+          LEFT JOIN player_ai_profiles creator_profile ON creator_profile.user_id = creator.id
           LEFT JOIN users opponent ON opponent.id = b.opponent_id
           WHERE b.status = ${status}
           ORDER BY b.created_at DESC
@@ -102,9 +133,19 @@ export async function GET(req: NextRequest) {
             b.id, b.battle_code, b.title, b.topic, b.battle_type, b.mode, b.status,
             b.rounds, b.winner_id, b.ai_summary, b.created_at, b.started_at, b.completed_at, b.expires_at,
             creator.id AS creator_id, creator.username AS creator_username, creator.avatar_url AS creator_avatar,
+            creator_profile.preferred_battle_style AS creator_playstyle,
+            creator_profile.strengths AS creator_strengths,
+            creator_profile.weaknesses AS creator_weaknesses,
+            creator_profile.average_creativity AS creator_average_creativity,
+            creator_profile.average_logic AS creator_average_logic,
+            creator_profile.average_humor AS creator_average_humor,
+            creator_profile.average_originality AS creator_average_originality,
+            creator_profile.average_comeback AS creator_average_comeback,
+            creator_profile.average_entertainment AS creator_average_entertainment,
             opponent.id AS opponent_id, opponent.username AS opponent_username, opponent.avatar_url AS opponent_avatar
           FROM battles b
           JOIN users creator ON creator.id = b.created_by
+          LEFT JOIN player_ai_profiles creator_profile ON creator_profile.user_id = creator.id
           LEFT JOIN users opponent ON opponent.id = b.opponent_id
           WHERE b.status NOT IN ('cancelled', 'expired', 'deleted')
           ORDER BY b.created_at DESC
@@ -149,6 +190,14 @@ export async function POST(req: NextRequest) {
       VALUES (${title}, ${topic}, ${battleType}, ${mode}, 'waiting', ${session.userId}, ${rounds}, ${battleCode}, ${expiresAt.toISOString()})
       RETURNING id, battle_code, title, topic, battle_type, mode, status, rounds, created_at, expires_at
     `;
+
+    await notifyRecommendedBattle({
+      battleId: rows[0].id,
+      battleTitle: rows[0].title,
+      topic: rows[0].topic,
+      creatorId: session.userId,
+      creatorUsername: session.username,
+    });
 
     return NextResponse.json({ battle: rows[0] }, { status: 201 });
   } catch (err) {

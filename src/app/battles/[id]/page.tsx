@@ -78,6 +78,23 @@ interface CoachingResult {
   };
 }
 
+interface OpponentInsight {
+  opponentStyle: string;
+  strengths: string[];
+  weaknesses: string[];
+  averageScores: ScoreSet;
+  favoriteTopics: string[];
+  recentPerformance: string;
+  summary: string;
+  compatibility?: {
+    score: number;
+    difficulty: string;
+    predictedQuality: number;
+    predictedWinChance: number;
+    reason: string;
+  };
+}
+
 function avatarFor(username: string, avatarUrl: string | null) {
   return avatarUrl || `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(username)}`;
 }
@@ -127,6 +144,8 @@ export default function BattleDetailPage() {
   const [coaching, setCoaching] = useState<CoachingResult | null>(null);
   const [coachingLoading, setCoachingLoading] = useState(false);
   const [coachingError, setCoachingError] = useState<string | null>(null);
+  const [opponentInsight, setOpponentInsight] = useState<OpponentInsight | null>(null);
+  const [joining, setJoining] = useState(false);
   const coachingFetchedRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -148,6 +167,14 @@ export default function BattleDetailPage() {
     const interval = setInterval(load, 4000);
     return () => clearInterval(interval);
   }, [battle, load]);
+
+  useEffect(() => {
+    if (!battle || battle.status !== "waiting") return;
+    fetch(`/api/battles/${battleId}/insights`)
+      .then((res) => (res.ok ? res.json() : { insight: null }))
+      .then((data) => setOpponentInsight(data.insight ?? null))
+      .catch(() => setOpponentInsight(null));
+  }, [battle, battleId]);
 
   // AI Coach — runs once per (user, battle) after the battle is judged.
   // Never during a live battle: gated on status === "completed". The ref
@@ -213,6 +240,24 @@ export default function BattleDetailPage() {
       await load();
     } catch { setError("Could not reach the server."); }
     finally { setActionBusy(false); }
+  }
+
+  async function handleJoin() {
+    setJoining(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/battles/${battleId}/join`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not join this battle.");
+        return;
+      }
+      await load();
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setJoining(false);
+    }
   }
 
   async function handleDelete() {
@@ -632,9 +677,39 @@ export default function BattleDetailPage() {
 
       {/* Waiting for opponent */}
       {battle.status === "waiting" && (
-        <div className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5 text-center">
-          <p className="text-sm text-white/40">Waiting for an opponent to join this battle.</p>
-          {countdown && <p className="mt-1 text-xs text-white/25">Expires in {countdown}</p>}
+        <div className="mb-5 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+          <div className="text-center">
+            <p className="text-sm text-white/40">Waiting for an opponent to join this battle.</p>
+            {countdown && <p className="mt-1 text-xs text-white/25">Expires in {countdown}</p>}
+          </div>
+
+          {opponentInsight && (
+            <div className="mt-4 rounded-xl border border-aura-purple/20 bg-aura-purple/[0.06] p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wider text-aura-purple">Opponent Insight</p>
+                {opponentInsight.compatibility && (
+                  <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs font-bold text-white/60">
+                    {opponentInsight.compatibility.score}% match · {opponentInsight.compatibility.difficulty}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm leading-relaxed text-white/60">{opponentInsight.summary}</p>
+              <div className="mt-3 grid gap-3 text-xs text-white/50 sm:grid-cols-3">
+                <p>Style: <span className="font-semibold text-white/75">{opponentInsight.opponentStyle}</span></p>
+                <p>Strong: <span className="text-white/70">{opponentInsight.strengths.slice(0, 2).join(", ")}</span></p>
+                <p>Weak: <span className="text-white/70">{opponentInsight.weaknesses.slice(0, 2).join(", ")}</span></p>
+              </div>
+              {opponentInsight.compatibility && (
+                <p className="mt-3 text-xs text-white/45">{opponentInsight.compatibility.reason}</p>
+              )}
+            </div>
+          )}
+
+          {user && user.id !== battle.creator_id && (
+            <Button className="mt-4 w-full" onClick={handleJoin} disabled={joining}>
+              {joining ? "Joining..." : "Join Battle"}
+            </Button>
+          )}
         </div>
       )}
 

@@ -6,7 +6,10 @@ export type NotificationType =
   | "challenged"
   | "battle_ending_soon"
   | "battle_expired"
-  | "winner_announced";
+  | "winner_announced"
+  | "recommended_battle"
+  | "recommended_opponent"
+  | "favorite_topic_trending";
 
 interface CreateNotificationInput {
   userId: string;
@@ -71,5 +74,44 @@ export async function notifyInterestedUsers(opts: {
     );
   } catch (err) {
     console.error("notifyInterestedUsers failed:", err);
+  }
+}
+
+/** Phase 4: only notify users when a new battle matches profile-level
+ *  interest signals. This is deliberately conservative: at most 20 users,
+ *  excludes the creator, and swallows errors like every notification helper. */
+export async function notifyRecommendedBattle(opts: {
+  battleId: string;
+  battleTitle: string;
+  topic: string;
+  creatorId: string;
+  creatorUsername: string;
+}) {
+  try {
+    const rows = (await sql`
+      SELECT p.user_id
+      FROM player_ai_profiles p
+      WHERE p.user_id != ${opts.creatorId}
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(p.favorite_topics) topic
+          WHERE lower(COALESCE(topic->>'topic', topic#>>'{}')) = lower(${opts.topic})
+        )
+      ORDER BY p.last_updated DESC
+      LIMIT 20
+    `) as { user_id: string }[];
+
+    for (const row of rows) {
+      await createNotification({
+        userId: row.user_id,
+        type: "recommended_battle",
+        title: "Recommended battle",
+        body: `${opts.creatorUsername} started a ${opts.topic} battle that matches your profile.`,
+        battleId: opts.battleId,
+        actorId: opts.creatorId,
+      });
+    }
+  } catch (err) {
+    console.error("notifyRecommendedBattle failed:", err);
   }
 }

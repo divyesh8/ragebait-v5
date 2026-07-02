@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 
@@ -23,6 +23,21 @@ interface ChallengeFormProps {
   onClose: () => void;
 }
 
+interface OpponentRecommendation {
+  opponent: {
+    username: string;
+    avatarUrl: string | null;
+  };
+  compatibilityScore: number;
+  difficultyRating: string;
+  predictedWinChance: number;
+  reason: string;
+}
+
+function avatarFor(username: string, avatarUrl: string | null) {
+  return avatarUrl || `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(username)}`;
+}
+
 export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
   const [toUsername, setToUsername] = useState("");
   const [title, setTitle] = useState("");
@@ -34,6 +49,14 @@ export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState<OpponentRecommendation[]>([]);
+
+  useEffect(() => {
+    fetch("/api/recommendations/opponents?limit=4")
+      .then((res) => (res.ok ? res.json() : { opponents: [] }))
+      .then((data) => setRecommendations(data.opponents ?? []))
+      .catch(() => setRecommendations([]));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -99,6 +122,34 @@ export default function ChallengeForm({ onSent, onClose }: ChallengeFormProps) {
           {success && (
             <div className="rounded-xl border border-aura-blue/40 bg-aura-blue/10 px-4 py-3 text-sm text-white/65">
               {success}
+            </div>
+          )}
+
+          {recommendations.length > 0 && (
+            <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+              <p className="mb-2 text-xs font-black uppercase tracking-wider text-white/45">Suggested opponents</p>
+              <div className="space-y-2">
+                {recommendations.map((match) => (
+                  <button
+                    key={match.opponent.username}
+                    type="button"
+                    onClick={() => setToUsername(match.opponent.username)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-left transition hover:border-aura-purple/40 hover:bg-aura-purple/8"
+                  >
+                    <img
+                      src={avatarFor(match.opponent.username, match.opponent.avatarUrl)}
+                      alt={match.opponent.username}
+                      className="h-8 w-8 rounded-lg border border-white/10"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-white">{match.opponent.username}</p>
+                      <p className="truncate text-[11px] text-white/40">
+                        {match.compatibilityScore}% fit · {match.difficultyRating} · {match.predictedWinChance}% win chance
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
