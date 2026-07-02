@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getSessionFromRequest } from "@/lib/auth";
-import { moderateBattleMessage } from "@/lib/moderation";
+import { analyzeMessage } from "@/services/aiModerator";
 import { z } from "zod";
 
 const messageSchema = z.object({
@@ -70,11 +70,29 @@ export async function POST(
 
     // AI moderation gate — run before the message ever touches the DB.
     // Local rules first (instant), then an OpenAI moderation pass if a key
-    // is configured. Blocked content is never persisted.
-    const moderation = await moderateBattleMessage(parsed.data.content);
-    if (!moderation.allowed) {
+    // is configured. Recent messages from this user in this battle are
+    // passed along so the moderator can catch repeat/flood spam.
+    const recentRows = await sql`
+      SELECT content FROM battle_messages
+      WHERE battle_id = ${id} AND user_id = ${session.userId}
+      ORDER BY created_at DESC LIMIT 10
+    `;
+    const verdict = await analyzeMessage(parsed.data.content, {
+      recentMessages: recentRows.map((r) => r.content as string),
+    });
+
+    if (verdict.action === "BLOCK") {
+      await sql`
+        INSERT INTO moderation_logs (user_id, battle_id, message_id, action, category, reason)
+        VALUES (${session.userId}, ${id}, NULL, 'BLOCK', ${verdict.category}, ${verdict.reason})
+      `;
       return NextResponse.json(
-        { error: moderation.reason ?? "This message violates Ragebait rules." },
+        {
+          error: "Message blocked. Keep the battle competitive.",
+          category: verdict.category,
+          reason: verdict.reason,
+          toxicity_score: verdict.toxicity_score,
+        },
         { status: 422 }
       );
     }
@@ -83,6 +101,11 @@ export async function POST(
       INSERT INTO battle_messages (battle_id, user_id, content, round)
       VALUES (${id}, ${session.userId}, ${parsed.data.content}, ${round})
       RETURNING id, content, round, created_at
+    `;
+
+    await sql`
+      INSERT INTO moderation_logs (user_id, battle_id, message_id, action, category, reason)
+      VALUES (${session.userId}, ${id}, ${inserted[0].id}, ${verdict.action}, ${verdict.category}, ${verdict.reason})
     `;
 
     // Check if both participants have now posted all their rounds —
@@ -112,6 +135,15 @@ export async function POST(
     return NextResponse.json({
       message: inserted[0],
       readyForJudging,
+      warning:
+        verdict.action === "WARN"
+          ? {
+              message: "Keep attacks focused on arguments, not users.",
+              category: verdict.category,
+              reason: verdict.reason,
+              toxicity_score: verdict.toxicity_score,
+            }
+          : null,
     });
   } catch (err) {
     console.error("Post battle message error:", err);

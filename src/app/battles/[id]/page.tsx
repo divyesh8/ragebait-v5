@@ -92,6 +92,7 @@ export default function BattleDetailPage() {
   const [posting, setPosting] = useState(false);
   const [judging, setJudging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -125,7 +126,7 @@ export default function BattleDetailPage() {
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim()) return;
-    setPosting(true); setError(null);
+    setPosting(true); setError(null); setWarning(null);
     try {
       const res = await fetch(`/api/battles/${battleId}/messages`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -133,6 +134,7 @@ export default function BattleDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not post message."); setPosting(false); return; }
+      if (data.warning) { setWarning(data.warning.message ?? "Keep attacks focused on arguments, not users."); }
       setContent(""); await load();
     } catch { setError("Could not reach the server."); }
     finally { setPosting(false); }
@@ -526,6 +528,11 @@ export default function BattleDetailPage() {
       {canPost && (
         <form onSubmit={handlePost} className="mt-5 flex gap-3">
           <div className="flex-1 relative">
+            {warning && (
+              <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-400">
+                ⚠️ {warning}
+              </div>
+            )}
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
