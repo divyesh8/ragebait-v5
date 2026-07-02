@@ -185,11 +185,13 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
               className="mt-1.5 w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-white focus-visible:border-aura-purple"
             >
               {topics.map((t) => (
-                <option key={t} value={t}>
+                <option key={t} value={t} className="bg-[#0a0a0a] text-white">
                   {t}
                 </option>
               ))}
-              <option value="__custom__">Custom topic...</option>
+              <option value="__custom__" className="bg-[#0a0a0a] text-white">
+                Custom topic...
+              </option>
             </select>
 
             {isCustomTopic && (
@@ -219,7 +221,7 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
                 className="mt-1.5 w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm capitalize text-white focus-visible:border-aura-purple"
               >
                 {battleTypes.map((t) => (
-                  <option key={t} value={t}>
+                  <option key={t} value={t} className="bg-[#0a0a0a] text-white">
                     {t}
                   </option>
                 ))}
@@ -236,7 +238,7 @@ export default function CreateBattleForm({ onCreated, onClose }: CreateBattleFor
                 className="mt-1.5 w-full rounded-xl border border-white/8 bg-white/[0.04] px-4 py-3 text-sm capitalize text-white focus-visible:border-aura-purple"
               >
                 {modes.map((m) => (
-                  <option key={m} value={m}>
+                  <option key={m} value={m} className="bg-[#0a0a0a] text-white">
                     {m}
                   </option>
                 ))}
